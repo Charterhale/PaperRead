@@ -1,0 +1,25 @@
+node_modules/
+.npm-cache/
+dist/
+release/
+test-results/
+playwright-report/
+.env
+.DS_Store
+
+.electron-download/
+.package-stage/
+*.tsbuildinfo
+
+.paperlens-jobs/
+backups/
+*.paperlens.gz
+*.paperlens.json
+
+# Local reading data and generated verification output never belong in Git.
+.paperlens-backups/
+artifacts/
+.env.*
+!.env.example
+public/pdfjs/
+*.log

@@ -1,0 +1,2 @@
+.tool-hover-hint{position:fixed;z-index:500;pointer-events:none;max-width:min(290px,calc(100vw - 16px));padding:9px 12px;border:1px solid var(--border,#e5e6ed);border-radius:9px;background:var(--panel,#fff);color:var(--text,#343746);box-shadow:0 5px 20px #15203224;font-size:12px;line-height:1.65;overflow-wrap:anywhere}
+.tool-hover-hint strong{display:block;font-weight:600}.tool-hover-hint span{display:block;font-size:11px;color:var(--muted,#777c8b);margin-top:3px}

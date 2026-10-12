@@ -1,0 +1,77 @@
+import { chromium, expect } from '@playwright/test';
+import assert from 'node:assert/strict';
+import { mkdtemp, rm } from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
+import { startServer } from '../server/index.mjs';
+const dir=await mkdtemp(path.join(os.tmpdir(),'paperlens-ui-backup-'));
+const backend=await startServer({port:0,backupDir:path.join(dir,'backups'),jobDir:path.join(dir,'jobs')});
+const browser=await chromium.launch({executablePath:'/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge',headless:true});
+const page=await browser.newPage({viewport:{width:1600,height:1000}}),errors=[],passed=[];
+page.on('pageerror',e=>errors.push(e.message));
+try{
+  await page.route('**/api/jobs',r=>r.fulfill({json:{jobs:[]}}));
+  await page.route('**/api/jobs/archive',r=>r.fulfill({json:{format:'paperlens-jobs',version:1,exportedAt:1,records:[]}}));
+  await page.route('**/api/backups**',async r=>{const url=new URL(r.request().url());const response=await r.fetch({url:'http://127.0.0.1:'+backend.address().port+url.pathname+url.search});await r.fulfill({response});});
+  await page.goto(process.env.TEST_URL||'http://127.0.0.1:5178');await page.waitForSelector('.pdf-page-wrap canvas');
+  const original=await page.evaluate(async()=>{
+    const s=await import('/src/lib/storage.ts'),{demoPaper}=await import('/src/lib/demo.ts'),{openPdf}=await import('/src/lib/pdf.ts');
+    const bytes=new Uint8Array(await(await fetch('/demo.pdf')).arrayBuffer()),task=openPdf(bytes),doc=await task.promise,key='paperlens-pdf-'+doc.fingerprints[0];const actualPages=[];for(let i=1;i<=doc.numPages;i++){const text=await(await doc.getPage(i)).getTextContent();actualPages.push(text.items.map(x=>x.str||'').join(' '));}await task.destroy();
+    const p={...structuredClone(demoPaper),id:'feature-paper',pages:actualPages,demo:false,title:'测试文献 Alpha',notes:'# 原有笔记\n\n保留的旧笔记。\n\n## 方法\n\n可搜索的星系笔记标记。',analysisEdited:true};
+    const section=p.analysis.sections[1],figure=section.figures[0],panel=figure.panels[0];
+    const canvas=document.createElement('canvas');canvas.width=600;canvas.height=320;const ctx=canvas.getContext('2d');ctx.fillStyle='#d0d7f5';ctx.fillRect(0,0,600,320);ctx.fillStyle='#4a4286';ctx.font='40px sans-serif';ctx.fillText('Figure A',50,150);
+    panel.image=canvas.toDataURL();panel.crop={x:.17,y:.26,width:.47,height:.29};panel.explanation+=' 独特子图搜索标记星云。';panel.method='完整实验方法测试'.repeat(60);
+    p.supplements=[{id:'sup',title:'补充 PDF',fileName:'sup.pdf',pageCount:p.pageCount,pages:p.pages,addedAt:1}];
+    await s.savePaper(p,bytes);await s.saveSupplement(p,'sup',bytes);
+    const q={...structuredClone(p),id:'feature-beta',title:'测试文献 Beta',notes:'跨文献笔记星际传递。'};await s.savePaper(q,bytes);await s.saveSupplement(q,'sup',bytes);
+    localStorage.setItem(key,JSON.stringify({bookmarks:[2],highlights:[{id:'old-h',page:figure.page,rotation:0,text:'原有摘录',comment:'独特高亮星河',color:'#123456',rectangles:[{x:.12,y:.18,width:.3,height:.03}]}]}));
+    s.writeLocal('annotation-map-'+p.id,{main:key,sup:key});s.writeLocal('annotation-map-'+q.id,{main:key,sup:key});
+    s.writeLocal('last-paper',p.id);s.writeLocal('page-'+p.id,section.page);s.writeLocal('reading-section-'+p.id,{id:section.id,page:section.page});s.writeLocal('auto-backup',{enabled:false,keep:3});
+    return {sectionId:section.id,figureId:figure.id,panel,notes:p.notes,key,pdfLength:bytes.length,analysis:p.analysis};
+  });
+  await page.reload();await page.waitForSelector('.pdf-page-wrap canvas');
+  const section=page.locator('.reader-section:not([hidden])'),panel=section.locator('.reader-panel').first();
+  await panel.getByRole('button',{name:'固定对照',exact:true}).click();await expect(page.locator('.pinned-picture')).toHaveCount(1);
+  const canvas=page.locator('.pinned-canvas');await canvas.hover();await page.mouse.wheel(0,-250);await page.waitForTimeout(100);
+  assert.notEqual(await canvas.locator('img').evaluate(n=>n.style.transform),'translate(0px,0px) scale(1)');
+  await section.getByRole('button',{name:'固定看图',exact:true}).first().click();await expect(page.locator('.pinned-picture')).toHaveCount(2);
+  await page.screenshot({path:'artifacts/fixed-figure-comparison.png'});
+  await page.locator('.pinned-picture').first().getByTitle('定位这张图的原文').click();await expect(page.locator('.pdf-target-region')).toHaveCount(1);
+  assert.equal(await page.locator('.pdf-target-region').evaluate(n=>Math.round(parseFloat(n.style.left))),17);
+  passed.push('固定两图、独立缩放、裁图原文范围精确定位');
+
+  async function search(text,kind='全部',scope='current'){await page.getByTitle('统一搜索 · ⌘ K').click();await page.getByLabel('搜索范围').selectOption(scope);await page.getByLabel('搜索内容类型').selectOption(kind);await page.getByLabel('搜索全文、解析、笔记和批注').fill(text);await expect(page.locator('.search-result').first()).toBeVisible();}
+  await search('独特子图搜索标记星云','子图');await page.locator('.search-result').first().click();
+  await expect(panel.locator('.panel-explanation')).toBeVisible();await expect(page.locator('.pdf-target-region')).toHaveCount(1);
+  await search('星系笔记','笔记');await page.locator('.search-result').click();await expect(page.locator('.note-preview')).toContainText('星系笔记');
+  await search('星际传递','笔记','all');await page.locator('.search-result').click();await expect(page.locator('.document-heading')).toContainText('测试文献 Beta');await expect(page.locator('.note-preview')).toContainText('星际传递');
+  await search('独特高亮星河','高亮');await page.locator('.search-result').last().click();await expect(page.getByLabel('选择正文或补充 PDF')).toHaveValue('sup');await expect(page.locator('.pdf-target-region')).toHaveCount(1);
+  passed.push('全文索引命中子图长字段并展开；跨文献笔记与补充 PDF 高亮跳转');
+  const firstWord=await page.locator('.pdf-text-layer span').filter({hasText:/[a-z]{7}/i}).first().innerText();
+  await search(firstWord.trim().split(/\s+/)[0],'原文');await page.locator('.search-result').first().click();await expect(page.locator('.pdf-target-region').first()).toBeVisible({timeout:6000});
+  passed.push('实际 PDF 文字跨文本项匹配并显示临时定位框');
+
+  await page.getByTitle('移入回收站',{exact:true}).click();await expect(page.locator('.document-heading')).not.toContainText('测试文献 Beta');
+  await page.getByRole('button',{name:'回收站',exact:true}).click();await expect(page.locator('.trash-row')).toContainText('测试文献 Beta');await page.getByRole('button',{name:'恢复',exact:true}).click();await expect(page.locator('.trash-row')).toHaveCount(0);await page.getByTitle('关闭回收站').click();
+  const state=await page.evaluate(async()=>{const s=await import('/src/lib/storage.ts');return {papers:await s.listPapers(),length:(await s.getPdf('feature-beta')).length,sup:(await s.getSupplementPdf('feature-beta','sup')).length,marks:JSON.parse(localStorage.getItem((s.readLocal('annotation-map-feature-beta',{})).main))};});
+  assert.equal(state.length,original.pdfLength);assert.equal(state.sup,original.pdfLength);assert.deepEqual(state.papers.find(p=>p.id==='feature-beta').analysis,original.analysis);assert.equal(state.marks.highlights[0].comment,'独特高亮星河');assert.equal(state.marks.highlights[0].color,'#123456');
+  passed.push('回收站往返保留正文、补充 PDF、全部解析、裁图、笔记和高亮');
+  await page.getByTitle('完整备份与恢复',{exact:true}).click();await page.getByRole('button',{name:'立即备份到本机',exact:true}).click();await expect(page.locator('.automatic-backup-list>div')).toHaveCount(1,{timeout:20000});await page.getByRole('button',{name:'预览与恢复',exact:true}).click();await expect(page.locator('.backup-preview')).toContainText('2');
+  const backupState=await page.evaluate(async()=>{const s=await import('/src/lib/storage.ts');const list=await(await fetch('/api/backups')).json(),r=await fetch('/api/backups/'+list.items[0].id),archive=await s.inspectBackup(await r.blob());return {papers:archive.papers.length,panels:archive.papers[0].paper.analysis.sections.flatMap(s=>s.figures.flatMap(f=>f.panels)).filter(p=>p.image).length,keys:JSON.stringify(archive).includes('apiKey')};});
+  assert.equal(backupState.papers,2);assert.ok(backupState.panels>0);assert.equal(backupState.keys,false);
+  passed.push('本机自动备份实际写入、校验、列表预览，包含裁图并排除密钥');
+  await page.getByTitle('关闭备份与恢复').click();
+  await page.locator('.paper-item').filter({hasText:'测试文献 Alpha'}).click();await page.waitForSelector('.pdf-page-wrap canvas');
+  await page.locator('.reader-section:not([hidden])').getByTitle('校准小节原文位置').click();
+  await expect(page.locator('.pdf-scroll')).toHaveClass(/pdf-crop-mode/);
+  const box=await page.locator('[data-pdf-page="2"]').boundingBox();
+  await page.mouse.move(box.x+box.width*.15,box.y+45);await page.mouse.down();await page.mouse.move(box.x+box.width*.6,box.y+115,{steps:7});await page.mouse.up();
+  await expect(page.locator('.toast')).toContainText('原文位置已保存',{timeout:10000});
+  const bound=await page.evaluate(async()=>{const s=await import('/src/lib/storage.ts');return (await s.listPapers()).find(p=>p.id==='feature-paper').analysis.sections[1].source;});
+  assert.equal(bound.page,2);assert.ok(bound.region.width>.4);
+  await page.reload();await page.waitForSelector('.pdf-page-wrap canvas');await page.locator('.reader-section:not([hidden])').getByTitle('定位原文第 2 页').click();await expect(page.locator('.pdf-target-region')).toHaveCount(1);
+  passed.push('手动框选原文定位保存并跨重启恢复');
+  await page.setViewportSize({width:1060,height:800});
+  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await page.screenshot({path:'artifacts/workspace-features-narrow.png'});
+  assert.deepEqual(errors,[]);console.log(JSON.stringify({passed,errors},null,2));
+}finally{await browser.close();await backend.jobs.close();await new Promise(r=>backend.close(r));await rm(dir,{recursive:true,force:true});}

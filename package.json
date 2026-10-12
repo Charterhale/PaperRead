@@ -1,0 +1,40 @@
+{
+  "name": "paperread",
+  "version": "0.6.1",
+  "private": true,
+  "type": "module",
+  "description": "PaperRead — 医学文献深度阅读工作台",
+  "main": "electron/main.cjs",
+  "scripts": {
+    "dev": "concurrently -k \"node server/index.mjs\" \"vite --host 127.0.0.1\"",
+    "build": "tsc -b && vite build",
+    "start": "node server/index.mjs --production",
+    "test": "node --test tests/*.test.mjs",
+    "desktop": "electron .",
+    "package:mac": "npm run build && node scripts/package-mac.mjs",
+    "predev": "node scripts/copy-pdf-assets.mjs",
+    "prebuild": "node scripts/copy-pdf-assets.mjs"
+  },
+  "dependencies": {
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "lucide-react": "^0.468.0",
+    "pdfjs-dist": "^5.4.0",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1",
+    "express": "^5.1.0",
+    "pdf-lib": "^1.17.1"
+  },
+  "devDependencies": {
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
+    "@types/node": "^24.0.0",
+    "typescript": "^5.8.0",
+    "vite": "^7.1.0",
+    "@vitejs/plugin-react": "^5.0.0",
+    "concurrently": "^9.2.0",
+    "@playwright/test": "^1.55.0",
+    "electron": "^38.0.0",
+    "@electron/packager": "^19.0.0"
+  }
+}

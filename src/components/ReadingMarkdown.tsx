@@ -1,0 +1,9 @@
+import { createContext, useContext } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import { referencePattern } from '../lib/readingFeatures';
+export const ReadingLinksContext=createContext<{onReference?:(reference:string)=>void;onPage?:(documentId:string,page:number)=>void}>({});
+type Node={type:string;value?:string;url?:string;children?:Node[]};
+function linkReferences(){return (tree:Node)=>{const visit=(node:Node)=>{if(['link','code','inlineCode','html'].includes(node.type)||!node.children)return;node.children=node.children.flatMap(child=>{if(child.type!=='text'||!child.value){visit(child);return[child];}const text=child.value,parts:Node[]=[];let end=0;for(const match of text.matchAll(new RegExp(referencePattern))){const start=match.index!;if(start>end)parts.push({type:'text',value:text.slice(end,start)});parts.push({type:'link',url:'#pl-reference='+encodeURIComponent(match[0]),children:[{type:'text',value:match[0]}]});end=start+match[0].length;}if(end<text.length)parts.push({type:'text',value:text.slice(end)});return parts.length?parts:[child];});};visit(tree);};}
+const plugins=[remarkGfm,linkReferences];
+export default function ReadingMarkdown({children}:{children:string}){const links=useContext(ReadingLinksContext);return <ReactMarkdown remarkPlugins={plugins} components={{a:({href,children,...props})=><a {...props} href={href} target={href?.startsWith('https:')?'_blank':undefined} rel="noreferrer" onClick={e=>{if(href?.startsWith('#pl-reference=')&&links.onReference){e.preventDefault();links.onReference(decodeURIComponent(href.slice(14)));}else if(href?.startsWith('#pl-pdf?')&&links.onPage){e.preventDefault();const q=new URLSearchParams(href.slice(8)),p=Number(q.get('page'));if(Number.isInteger(p)&&p>0)links.onPage(q.get('document')||'main',p);}}}>{children}</a>}}>{children}</ReactMarkdown>;}
