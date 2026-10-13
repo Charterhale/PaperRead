@@ -1,6 +1,6 @@
 {
   "name": "paperread",
-  "version": "0.6.1",
+  "version": "0.7.0",
   "private": true,
   "type": "module",
   "description": "PaperRead — 医学文献深度阅读工作台",

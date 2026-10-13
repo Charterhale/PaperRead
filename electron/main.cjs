@@ -3,8 +3,9 @@ const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 
 app.setName('PaperRead');
+const isolatedProfile = process.argv.some(arg => arg.startsWith('--user-data-dir='));
 // Preserve the established profile and IndexedDB origin after the rename.
-if (!process.argv.some(arg => arg.startsWith('--user-data-dir='))) app.setPath('userData', path.join(app.getPath('appData'), 'PaperLens'));
+if (!isolatedProfile) app.setPath('userData', path.join(app.getPath('appData'), 'PaperLens'));
 let mainWindow;
 let localServer;
 let localOrigin;
@@ -26,7 +27,7 @@ async function createWindow() {
     const { startServer } = await import(pathToFileURL(path.join(__dirname, '../server/index.mjs')).href);
     localServer = await startServer({
       // Keep a stable origin: IndexedDB and localStorage are scoped to the port.
-      port: 41829,
+      port: isolatedProfile ? 0 : 41829,
       production: true,
       staticDir: path.join(__dirname, '../dist'),
       jobDir: path.join(app.getPath('userData'), 'jobs'),
@@ -96,5 +97,17 @@ app.on('before-quit', (event) => {
   event.preventDefault();
   if (jobsClosing) return;
   jobsClosing = true;
-  Promise.resolve(localServer.jobs.close()).finally(() => { jobsClosed = true; localServer.close(); app.quit(); });
+  Promise.resolve(localServer.jobs.close()).then(() => {
+    jobsClosed = true;
+    localServer.close();
+    localServer.closeAllConnections?.();
+    // All job checkpoints are durable before quitting. A stale native window
+    // must not leave a headless process holding the single-instance lock.
+    const exitFallback = setTimeout(() => app.exit(0), 1500);
+    exitFallback.unref();
+    app.quit();
+  }).catch(error => {
+    jobsClosing = false;
+    dialog.showErrorBox('PaperRead 暂未退出', '后台任务保存未完成，请重新尝试退出。\n' + error.message);
+  });
 });

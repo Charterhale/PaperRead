@@ -1,3 +1,4 @@
+import { clickTool } from './helpers/menu.mjs';
 import { chromium, expect } from '@playwright/test';
 import assert from 'node:assert/strict';
 import { mkdtemp, rm } from 'node:fs/promises';
@@ -31,10 +32,10 @@ try{
   });
   await page.reload();await page.waitForSelector('.pdf-page-wrap canvas');
   const section=page.locator('.reader-section:not([hidden])'),panel=section.locator('.reader-panel').first();
-  await panel.getByRole('button',{name:'固定对照',exact:true}).click();await expect(page.locator('.pinned-picture')).toHaveCount(1);
+  await panel.locator(':scope > summary').click();await panel.getByRole('button',{name:'固定对照',exact:true}).click();await expect(page.locator('.pinned-picture')).toHaveCount(1);
   const canvas=page.locator('.pinned-canvas');await canvas.hover();await page.mouse.wheel(0,-250);await page.waitForTimeout(100);
   assert.notEqual(await canvas.locator('img').evaluate(n=>n.style.transform),'translate(0px,0px) scale(1)');
-  await section.getByRole('button',{name:'固定看图',exact:true}).first().click();await expect(page.locator('.pinned-picture')).toHaveCount(2);
+  await section.getByRole('button',{name:'更多图表工具',exact:true}).first().click();await section.getByRole('button',{name:'固定看图',exact:true}).first().click();await expect(page.locator('.pinned-picture')).toHaveCount(2);
   await page.screenshot({path:'artifacts/fixed-figure-comparison.png'});
   await page.locator('.pinned-picture').first().getByTitle('定位这张图的原文').click();await expect(page.locator('.pdf-target-region')).toHaveCount(1);
   assert.equal(await page.locator('.pdf-target-region').evaluate(n=>Math.round(parseFloat(n.style.left))),17);
@@ -51,12 +52,12 @@ try{
   await search(firstWord.trim().split(/\s+/)[0],'原文');await page.locator('.search-result').first().click();await expect(page.locator('.pdf-target-region').first()).toBeVisible({timeout:6000});
   passed.push('实际 PDF 文字跨文本项匹配并显示临时定位框');
 
-  await page.getByTitle('移入回收站',{exact:true}).click();await expect(page.locator('.document-heading')).not.toContainText('测试文献 Beta');
+  await clickTool(page,'移入回收站');await expect(page.locator('.document-heading')).not.toContainText('测试文献 Beta');
   await page.getByRole('button',{name:'回收站',exact:true}).click();await expect(page.locator('.trash-row')).toContainText('测试文献 Beta');await page.getByRole('button',{name:'恢复',exact:true}).click();await expect(page.locator('.trash-row')).toHaveCount(0);await page.getByTitle('关闭回收站').click();
   const state=await page.evaluate(async()=>{const s=await import('/src/lib/storage.ts');return {papers:await s.listPapers(),length:(await s.getPdf('feature-beta')).length,sup:(await s.getSupplementPdf('feature-beta','sup')).length,marks:JSON.parse(localStorage.getItem((s.readLocal('annotation-map-feature-beta',{})).main))};});
   assert.equal(state.length,original.pdfLength);assert.equal(state.sup,original.pdfLength);assert.deepEqual(state.papers.find(p=>p.id==='feature-beta').analysis,original.analysis);assert.equal(state.marks.highlights[0].comment,'独特高亮星河');assert.equal(state.marks.highlights[0].color,'#123456');
   passed.push('回收站往返保留正文、补充 PDF、全部解析、裁图、笔记和高亮');
-  await page.getByTitle('完整备份与恢复',{exact:true}).click();await page.getByRole('button',{name:'立即备份到本机',exact:true}).click();await expect(page.locator('.automatic-backup-list>div')).toHaveCount(1,{timeout:20000});await page.getByRole('button',{name:'预览与恢复',exact:true}).click();await expect(page.locator('.backup-preview')).toContainText('2');
+  await clickTool(page,'完整备份与恢复');await page.getByRole('button',{name:'立即备份到本机',exact:true}).click();await expect(page.locator('.automatic-backup-list>div')).toHaveCount(1,{timeout:20000});await page.getByRole('button',{name:'预览与恢复',exact:true}).click();await expect(page.locator('.backup-preview')).toContainText('2');
   const backupState=await page.evaluate(async()=>{const s=await import('/src/lib/storage.ts');const list=await(await fetch('/api/backups')).json(),r=await fetch('/api/backups/'+list.items[0].id),archive=await s.inspectBackup(await r.blob());return {papers:archive.papers.length,panels:archive.papers[0].paper.analysis.sections.flatMap(s=>s.figures.flatMap(f=>f.panels)).filter(p=>p.image).length,keys:JSON.stringify(archive).includes('apiKey')};});
   assert.equal(backupState.papers,2);assert.ok(backupState.panels>0);assert.equal(backupState.keys,false);
   passed.push('本机自动备份实际写入、校验、列表预览，包含裁图并排除密钥');

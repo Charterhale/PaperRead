@@ -1,3 +1,4 @@
+import { clickTool } from './helpers/menu.mjs';
 import { chromium, expect } from '@playwright/test';
 import assert from 'node:assert/strict';
 
@@ -35,6 +36,7 @@ try {
   assert.equal(await page.locator('.reader-overview').getAttribute('open'), null);
   assert.equal(await visibleSection().locator('.section-detail').getAttribute('open'), null);
   const panel = visibleSection().locator('.reader-panel').first();
+  await panel.locator(':scope > summary').click();
   await expect(panel.locator('[data-panel-field="takeaway"]')).toBeVisible();
   await expect(panel.locator('[data-panel-field="xAxis"]')).toBeHidden();
   passed.push('39 节长文默认只读当前节，结论先显示，长文与细节分层');
@@ -53,7 +55,7 @@ try {
 
   await page.getByTitle('折叠所有章节和子图').click();
   await expect(visibleSection()).not.toHaveAttribute('open', '');
-  await page.locator('.nav-figure').nth(2).click(); await page.waitForTimeout(500);
+  await page.locator('.nav-figures').nth(2).locator('summary').click();await page.locator('.nav-figure').nth(2).click(); await page.waitForTimeout(500);
   await expect(visibleSection()).toHaveAttribute('id', 'section-long-2');
   await expect(visibleSection()).toHaveAttribute('open', '');
   await expect(visibleSection().locator('.reader-figure')).toHaveAttribute('open', '');
@@ -102,12 +104,12 @@ try {
   await page.getByTitle('折叠所有章节和子图').click();
   await jump('long-0'); await visibleSection().locator('.reader-figure > summary').click(); await panel.locator(':scope > summary').click();
   await page.screenshot({ path: 'artifacts/reader-comfort-light.png' });
-  await page.getByTitle('切换明暗主题').click(); await page.screenshot({ path: 'artifacts/reader-comfort-dark.png' }); await page.getByTitle('切换明暗主题').click();
+  await clickTool(page,'切换明暗主题'); await page.screenshot({ path: 'artifacts/reader-comfort-dark.png' }); await clickTool(page,'切换明暗主题');
   await panel.getByRole('button', { name: '编辑解析', exact: true }).click();
   await page.getByLabel('如何读这张图').fill('编辑后仍可完整展开查看。'); await page.getByRole('button', { name: '保存子图解析', exact: true }).click();
   await panel.locator('.panel-detail-group').first().locator('summary').click();
   await expect(panel.locator('[data-panel-field="readout"]')).toHaveText(/编辑后仍可完整展开查看/);
-  await page.getByTitle('编辑历史与恢复').click(); await expect(page.locator('.revision-row')).toHaveCount(1); await page.getByTitle('关闭编辑历史').click();
+  await clickTool(page,'编辑历史与恢复'); await expect(page.locator('.revision-row')).toHaveCount(1); await page.getByTitle('关闭编辑历史').click();
   passed.push('子图编辑、版本恢复入口和全部明暗样式保持可用');
 
   await page.setViewportSize({ width: 1060, height: 820 });

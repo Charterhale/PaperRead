@@ -1,3 +1,4 @@
+import { clickTool } from './helpers/menu.mjs';
 import {chromium} from '@playwright/test';
 import assert from 'node:assert/strict';
 import {writeFile} from 'node:fs/promises';
@@ -18,6 +19,6 @@ try{
  await page.getByLabel('向文献提问').fill('测试 Codex');await page.getByTitle('发送问题').click();await page.waitForSelector('.chat-message.assistant');assert.equal(requests[0].provider,'codex');assert.equal(requests[0].model,'gpt-test-model');assert.equal(requests[0].reasoningEffort,'high');assert(!('apiKey' in requests[0]));passed.push('Codex 请求不携带隐藏的 DeepSeek 密钥');
  await page.getByRole('button',{name:'设置',exact:true}).click();await page.getByLabel('AI 阅读服务').selectOption('deepseek');assert.equal(await page.getByLabel('DeepSeek API Key',{exact:true}).inputValue(),'test-key-only-never-persist');await page.getByRole('button',{name:'完成',exact:true}).click();await page.getByLabel('向文献提问').fill('测试手动 DeepSeek');await page.getByTitle('发送问题').click();await page.waitForFunction(()=>document.querySelectorAll('.chat-message.assistant').length===2);assert.equal(requests[1].provider,'deepseek');assert.equal(requests[1].apiKey,'test-key-only-never-persist');passed.push('DeepSeek 仅在手动选择后调用，密钥在本窗口保留');
  const settings=await page.evaluate(()=>JSON.parse(localStorage.getItem('pl-settings')));assert.equal(settings.provider,'deepseek');assert(!('apiKey' in settings));await page.reload();await page.getByRole('button',{name:'设置',exact:true}).click();assert.equal(await page.getByLabel('AI 阅读服务').inputValue(),'deepseek');assert.equal(await page.getByLabel('DeepSeek API Key',{exact:true}).inputValue(),'');passed.push('服务选择跨刷新保存，密钥不写入本机设置');
- await page.getByLabel('AI 阅读服务').selectOption('codex');await page.screenshot({path:'artifacts/codex-settings-light.png'});await page.getByRole('button',{name:'完成',exact:true}).click();await page.getByTitle('切换明暗主题').click();await page.getByRole('button',{name:'设置',exact:true}).click();await page.screenshot({path:'artifacts/codex-settings-dark.png'});assert.deepEqual(errors,[]);
+ await page.getByLabel('AI 阅读服务').selectOption('codex');await page.screenshot({path:'artifacts/codex-settings-light.png'});await page.getByRole('button',{name:'完成',exact:true}).click();await clickTool(page,'切换明暗主题');await page.getByRole('button',{name:'设置',exact:true}).click();await page.screenshot({path:'artifacts/codex-settings-dark.png'});assert.deepEqual(errors,[]);
  await writeFile('artifacts/codex-ui-verification.json',JSON.stringify({passed,errors},null,2));console.log(JSON.stringify({passed,errors},null,2));
 }finally{await browser.close();}

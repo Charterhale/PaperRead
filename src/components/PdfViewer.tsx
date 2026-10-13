@@ -451,7 +451,11 @@ const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(function PdfViewer
     if (!scrollRoot || !doc) return;
     const position = scrollRoot.getBoundingClientRect().top + Math.min(100, scrollRoot.clientHeight / 4);
     const pages = Array.from(scrollRoot.querySelectorAll<HTMLDivElement>('[data-pdf-page]'));
-    const closest = pages.find(element => element.getBoundingClientRect().bottom >= position);
+    // A short final page cannot always reach the top of a tall viewport.
+    // At the scroll limit, keep the final page selected instead of reverting
+    // to the preceding page whose bottom still crosses the reading anchor.
+    const atEnd = scrollRoot.scrollTop > 0 && scrollRoot.scrollHeight - scrollRoot.clientHeight - scrollRoot.scrollTop <= 1;
+    const closest = atEnd ? pages.at(-1) : pages.find(element => element.getBoundingClientRect().bottom >= position);
     const number = Number(closest?.dataset.pdfPage || 1);
     if (number !== currentPage.current) { currentPage.current = number; onPageChangeRef.current(number); }
   };
@@ -558,8 +562,8 @@ const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(function PdfViewer
 
   const selectMode=(next:'pointer'|'hand'|'text')=>{onCropCancel?.();stopWheelZoom();setMode(next);setHighlighter(false);setCropping(false);setCropDraft(null);setColorsOpen(false);gestureSuppressed.current=false;window.getSelection()?.removeAllRanges();};
   return <section className="pdf-viewer" aria-label="PDF 原文阅读器" tabIndex={0}>
-    <div className="pdf-panel-heading"><div className="pdf-heading-label"><span className="pdf-heading-icon"><FileText size={15} /></span><strong>PDF 原文</strong><span className="pdf-heading-sub">SOURCE</span></div><button className="pdf-icon-button" title="搜索 PDF 文字" aria-label="搜索 PDF 文字" onClick={() => setSearchOpen(value => !value)} disabled={!doc}><Search size={16} /></button></div>
-    <div className="pdf-toolbar">
+    
+    <div className="pdf-toolbar"><button className="pdf-icon-button" title="搜索 PDF 文字" aria-label="搜索 PDF 文字" onClick={() => setSearchOpen(value => !value)} disabled={!doc}><Search size={16} /></button>
       <div className="pdf-tool-group"><button className="pdf-icon-button" title="上一页" aria-label="上一页" onClick={() => {onBeforeNavigate?.();goToPage(activePage - 1);}} disabled={!doc || activePage <= 1}><ChevronLeft size={15} /></button><form className="pdf-page-form" onSubmit={event => { event.preventDefault(); if(Number(pageInput)!==activePage)onBeforeNavigate?.();goToPage(Number(pageInput)); }}><input aria-label="PDF 页码" value={pageInput} onChange={event => setPageInput(event.target.value)} onBlur={() => { if (Number(pageInput) >= 1) {if(Number(pageInput)!==activePage)onBeforeNavigate?.();goToPage(Number(pageInput));} else setPageInput(String(activePage)); }} inputMode="numeric" disabled={!doc} /><span>/ {doc?.numPages || '—'}</span></form><button className="pdf-icon-button" title="下一页" aria-label="下一页" onClick={() => {onBeforeNavigate?.();goToPage(activePage + 1);}} disabled={!doc || activePage >= doc.numPages}><ChevronRight size={15} /></button></div>
       <span className="pdf-toolbar-separator" />
       <div className="pdf-tool-group"><button className="pdf-icon-button" title="缩小" aria-label="缩小 PDF" onClick={() => changeZoom(-0.15)} disabled={!doc}><Minus size={14} /></button><button className={`pdf-zoom-label ${fit ? 'active' : ''}`} title="适合页面宽度" onClick={() => zoomAt(fitScale, undefined, undefined, true)} disabled={!doc}>{doc ? `${Math.round(scale * 100)}%` : '适宽'}<ChevronDown size={10} /></button><button className="pdf-icon-button" title="放大" aria-label="放大 PDF" onClick={() => changeZoom(0.15)} disabled={!doc}><Plus size={14} /></button><button className="pdf-icon-button pdf-fit-button" title="适合页面宽度" aria-label="适合页面宽度" onClick={() => zoomAt(fitScale, undefined, undefined, true)} disabled={!doc}><Maximize2 size={13} /></button></div>
