@@ -1,0 +1,43 @@
+import {chromium,expect} from '@playwright/test';
+import {createServer} from 'vite';
+import assert from 'node:assert/strict';
+import {writeFile} from 'node:fs/promises';
+const server=await createServer({server:{host:'127.0.0.1',port:0,strictPort:false},logLevel:'error'});await server.listen();
+const origin='http://127.0.0.1:'+server.httpServer.address().port;
+const browser=await chromium.launch({executablePath:'/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge',headless:true});
+const page=await browser.newPage({viewport:{width:1680,height:1080}}),errors=[],passed=[];page.on('pageerror',e=>errors.push(e.message));
+await page.route('**/api/**',r=>r.fulfill({json:{jobs:[],records:[],items:[],models:[],available:true,authenticated:true}}));
+try{
+ await page.goto(origin);await page.waitForSelector('.reader-section');
+ const original=await page.evaluate(async()=>{
+  const {demoPaper}=await import('/src/lib/demo.ts');const p=structuredClone(demoPaper);p.analysisEdited=true;p.notes='保留的笔记\n\n## 证据性质\n\n我自己的笔记照常显示。';
+  const base=p.analysis.sections.at(-1);base.title='讨论';base.shortTitle='讨论';base.markdown='讨论的第一段。\n\n### 证据性质\n\n元信息提示哨兵。\n\n### 结果解读\n\n实际结果保留。';
+  const continuations=Array.from({length:7},(_,i)=>({...structuredClone(base),id:'continuation-'+i,title:i===4?'Discussion (continued)':'续',shortTitle:'续',summary:'第'+(i+1)+'段的概述保留。',proves:'第'+(i+1)+'段的结论保留。',markdown:'第'+(i+1)+'段完整正文保留。',page:Math.min(6,i+1),figures:[]}));
+  const figure=structuredClone(p.analysis.sections[2].figures[0]);figure.id='continued-figure';figure.title='图9：续段中的结果图';figure.page=4;continuations.at(-1).figures=[figure];continuations.at(-1).page=4;
+  const admin={...structuredClone(base),id:'admin',title:'致谢、作者贡献与参考文献',shortTitle:'致谢',markdown:'行政信息哨兵',figures:[]};
+  const method={...structuredClone(base),id:'method',title:'方法：细胞分选',shortTitle:'方法',markdown:'完整方法保留',figures:[]};
+  p.analysis.sections.push(...continuations,admin,{...structuredClone(admin),id:'evidence-kind',title:'证据性质'},method);
+  p.analysis.logic={nodes:p.analysis.sections.map(s=>({id:'n-'+s.id,title:s.shortTitle,sectionId:s.id})),edges:[],mainNodeIds:['n-question','n-atlas','n-continuation-6','n-admin']};
+  p.outline=[{title:'Introduction',page:1},{title:'Discussion',page:2},...continuations.map(s=>({title:s.title,page:s.page})),{title:'Acknowledgements',page:6},{title:'Author contributions',page:6},{title:'References',page:6},{title:'Methods',page:6}];
+  localStorage.setItem('pl-demo-paper',JSON.stringify(p));localStorage.setItem('pl-reading-section-'+p.id,JSON.stringify({id:'continuation-6',page:4}));localStorage.setItem('pl-page-'+p.id,'4');return p;
+ });
+ await page.reload();await page.waitForSelector('.reader-section');await page.getByRole('button',{name:'全文浏览',exact:true}).click();
+ assert.equal(await page.locator('.reader-section').count(),7);assert.equal(await page.locator('.nav-entry').count(),7);assert.equal(await page.getByLabel('选择阅读小节').inputValue(),'boundaries');
+ assert.doesNotMatch(await page.locator('.reader-section-list').innerText(),/行政信息哨兵|致谢|作者贡献|参考文献/);
+ const discussion=page.locator('#section-boundaries');await expect(discussion.locator(':scope>summary h2')).toHaveText('讨论');assert.equal(await discussion.locator('.section-detail').count(),1);
+ await discussion.locator('.section-detail>summary').click();for(let i=1;i<=7;i++)await expect(discussion).toContainText('第'+i+'段完整正文保留');assert.doesNotMatch(await discussion.innerText(),/证据性质|元信息提示哨兵/);await expect(discussion).toContainText('实际结果保留');
+ await discussion.getByTitle('编辑本段解析').first().click();await expect(page.getByLabel('正文 Markdown',{exact:true})).toHaveValue('第1段完整正文保留。');await page.getByTitle('关闭小节编辑').click();
+ passed.push('七个续段合并为一个讨论，共用正文折叠入口，全部段落和原始编辑入口保留');
+ await page.getByTitle('折叠所有章节和子图').click();await page.locator('.nav-section').filter({hasText:'讨论'}).click();await expect(discussion).toHaveAttribute('open','');
+ await page.locator('.nav-figure').filter({hasText:'续段中的结果图'}).click();await expect(page.getByLabel('PDF 页码')).toHaveValue('4');await expect(page.locator('#figure-continued-figure')).toHaveAttribute('open','');
+ await expect(page.locator('.nav-section.active')).toContainText('讨论');assert.equal(await page.getByLabel('选择阅读小节').inputValue(),'boundaries');
+ passed.push('合并后的子图目录仍跳到所属续段和PDF页，统一目录高亮与选择器');
+ await page.getByTitle('返回研究主线').click();assert.doesNotMatch(await page.locator('.logic-map').innerText(),/致谢|作者贡献|参考文献|\bcontinued\b|^续$/im);
+ await page.getByRole('button',{name:'完整路线',exact:true}).click();assert.equal(await page.locator('.logic-node').count(),7);
+ await page.getByRole('button',{name:'原文大纲',exact:true}).click();assert.equal(await page.locator('.navigation .nav-section').count(),3);assert.doesNotMatch(await page.locator('.nav-scroll').innerText(),/致谢|作者贡献|参考文献|Acknowledgements|References|continued/);
+ passed.push('简洁与完整逻辑图、原文大纲均使用同一合并和排除规则');
+ await page.getByRole('button',{name:'解析目录',exact:true}).click();await page.getByLabel('选择阅读小节').selectOption('boundaries');await page.getByRole('button',{name:'逐节阅读',exact:true}).click();
+ await page.screenshot({path:'artifacts/v0.7.4-continuation-reading.png'});
+ const after=await page.evaluate(()=>JSON.parse(localStorage.getItem('pl-demo-paper')));assert.deepEqual(after.analysis,original.analysis);assert.equal(after.notes,original.notes);assert.deepEqual(errors,[]);
+ await page.getByRole('button',{name:'我的笔记',exact:true}).click();if(await page.getByRole('button',{name:'预览 Markdown',exact:true}).isVisible())await page.getByRole('button',{name:'预览 Markdown',exact:true}).click();await expect(page.locator('.note-preview')).toContainText('证据性质');await expect(page.locator('.note-preview')).toContainText('我自己的笔记照常显示');passed.push('新排版未改写任何原始章节、逻辑图或笔记，用户笔记不受解析文字过滤影响');await writeFile('artifacts/v0.7.4-continuation-checks.json',JSON.stringify({passed,errors},null,2));console.log(JSON.stringify({passed,errors},null,2));
+}catch(error){await page.screenshot({path:'artifacts/v0.7.4-continuation-error.png'});console.error(errors,await page.locator('body').innerText());throw error;}finally{await browser.close();await server.close();}

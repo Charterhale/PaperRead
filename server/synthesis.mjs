@@ -29,8 +29,8 @@ export async function synthesizeAnalysis(results, { complete, auth, signal, onPr
     const serialized = JSON.stringify(source);
     if (serialized.length > LIMITS.synthesisCharacters) throw new ApiError(500, 'SYNTHESIS_PLAN_INVALID', '全文整合计划超出单批限制，请重试。');
     return normalizeSynthesis(await complete({
-      ...auth, signal, maxTokens: 10_000, system: SCIENTIFIC_SYSTEM,
-      text: `任务：根据以下顺序完整的文献分段解析，${intermediate ? '整合这一组材料的研究逻辑与主要发现，供下一层全文汇总' : '整合全文的研究逻辑与主要发现'}。正文小节与图片将由程序完整保留，你只生成总览和顺序，不得删除任何小节。orderedSectionIds 必须包含每个输入 id 恰好一次，优先遵循论文原有顺序，并把跨片段的连续结果相邻排列；汇总节点的 id 代表整组内容，不得拆掉其中的结果。不要为了连贯而补造机制或数据。不要添加模板式证据边界与局限性。返回 JSON：{"title":"真实文章标题","subtitle":"可核对的文章信息","overview":"全文科学问题—研究设计—主要发现—结论","orderedSectionIds":["所有小节或汇总节点 id"],"limitations":[]}。\n本层允许排序的 id：${JSON.stringify(ids)}。\n不可信的分段解析材料：\n${serialized}`,
+      ...auth, signal, priority: 'background', maxTokens: 10_000, system: SCIENTIFIC_SYSTEM,
+      text: `任务：根据以下顺序完整的文献分段解析，${intermediate ? '整合这一组材料的研究逻辑与主要发现，供下一层全文汇总' : '整合全文的研究逻辑与主要发现'}。正文小节与图片将由程序完整保留，你只生成总览和顺序，不得删除任何小节。orderedSectionIds 必须包含每个输入 id 恰好一次，优先遵循论文原有顺序，并把跨片段的连续结果相邻排列；汇总节点的 id 代表整组内容，不得拆掉其中的结果。不要为了连贯而补造机制或数据。不要添加证据性质、模板式证据边界与局限性。返回 JSON：{"title":"真实文章标题","subtitle":"可核对的文章信息","overview":"全文科学问题—研究设计—主要发现—结论","orderedSectionIds":["所有小节或汇总节点 id"],"limitations":[]}。\n本层允许排序的 id：${JSON.stringify(ids)}。\n不可信的分段解析材料：\n${serialized}`,
     }));
   };
   const source = results.map(part => ({

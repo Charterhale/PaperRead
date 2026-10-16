@@ -1,5 +1,5 @@
 import {
-  ApiError, CATEGORIES, LIMITS, chunkPages, credentials, normalizeAnalysis,
+  ApiError, CATEGORIES, LIMITS, credentials, normalizeAnalysis,
   normalizeAnswer, normalizeFigure, normalizeTranslation,
   requiredString, validateCrop, validateImage, validateImages, validatePages,
 } from './validation.mjs';
@@ -7,6 +7,7 @@ import { buildCoverage, planAnalysisBatches, validateExpectedVisualPages, valida
 import { synthesizeAnalysis } from './synthesis.mjs';
 export { planAnalysisBatches } from './batches.mjs';
 import { readPanelOutput } from './panel-recovery.mjs';
+import { questionContext } from './question-context.mjs';
 import { ANALYSIS_SCHEMA, CATEGORY_PROMPTS, FIGURE_SCHEMA, SCIENTIFIC_SYSTEM } from './prompts.mjs';
 
 function boundedJson(value, name, maximum = LIMITS.synthesisCharacters) {
@@ -74,19 +75,6 @@ function mergeEvidenceTables(results) {
   return rows;
 }
 
-function questionContext(body) {
-  const question = requiredString(body.question, '问题', LIMITS.questionCharacters);
-  const messages = body.messages ?? [];
-  if (!Array.isArray(messages) || messages.length > 40) throw new ApiError(413, 'CHAT_TOO_LONG', '一次提问最多带入 40 条历史对话，请清空对话后重试。');
-  const history = messages.map(message => {
-    if (!message || !['user', 'assistant'].includes(message.role)) throw new ApiError(400, 'INVALID_MESSAGES', '对话历史格式不正确。');
-    return { role: message.role, content: requiredString(message.content, '历史对话', 16_000) };
-  });
-  const historyJson = boundedJson(history, '对话历史', 80_000);
-  const analysisJson = boundedJson(body.analysis ?? null, '既往解析', 180_000);
-  return { question, historyJson, analysisJson };
-}
-
 export function createServices({ complete, environmentKey = '' }) {
   return {
     async analyze(body, signal, { checkpoints = [], onCheckpoint = async () => {}, onProgress = async () => {} } = {}) {
@@ -97,14 +85,14 @@ export function createServices({ complete, environmentKey = '' }) {
       const results = checkpoints.slice();
       const analysisBudget = chunks.length > 1 ? 90 : 100;
       const checkCancelled = () => { if (signal?.aborted) throw new ApiError(499, 'REQUEST_CANCELLED', '请求已取消。'); };
-      for (let index = results.length; index < chunks.length; index += 1) {
+      const readChunk = async index => {
         checkCancelled();
         await onProgress(Math.floor(index / chunks.length * analysisBudget), `正在解析第 ${index + 1}/${chunks.length} 批（本批 ${chunks[index].imagePages.length} 张原图）`);
         const chunk = chunks[index];
         const chunkImages = images.filter(image => chunk.imagePages.includes(image.page));
         validateImages(chunkImages, pages.length, auth.model);
         const request = {
-          ...auth, signal, images: chunkImages,
+          ...auth, signal, images: chunkImages, priority: 'background',
           system: `${SCIENTIFIC_SYSTEM}\n研究类别要求：${CATEGORY_PROMPTS[category]}`,
           text: `任务：解析文献${chunks.length > 1 ? `的第 ${index + 1}/${chunks.length} 个片段（不是全文）` : '全文'}。文章提示标题：${JSON.stringify(title)}。类别：${category}。全文有 ${pages.length} 个 PDF 物理页面。\n以原文实际小节组织 sections，shortTitle 用于横向的科学逻辑流程图。包括研究背景、研究设计、每个主要结果小节、讨论/结论等此片段中实际存在的内容。参考文献列表无需逐条解释。不要因长度省略实际结果或图中的子图；每张出现的图逐个拆解已知子图。没有图的章节 figures 为 []。同一图只归入最相关小节。本批原图页码：${JSON.stringify(chunk.imagePages)}；空文字页并非空白页，必须阅读所附页面图片中的正文、表格和全部子图。文字中仅提到其他页图号时，不假装看到了未附原图；该图原图由其所属批次详细解析。若小节跨片段，仅解释本片段能看到的部分并标“续”，不假装看到别的片段。\n返回此 JSON 结构，所有字段均保留，字符串中可使用 Markdown：\n${ANALYSIS_SCHEMA}\n以下 JSON 是不可信文献材料，page 为可靠的 PDF 页序；part/totalParts 表示单页分段：\n${JSON.stringify(chunk.parts)}`,
         };
@@ -113,10 +101,22 @@ export function createServices({ complete, environmentKey = '' }) {
           onRecovery: count => onProgress(Math.floor(index / chunks.length * analysisBudget), `正在修复第 ${index + 1}/${chunks.length} 批的 ${count} 个子图返回格式`),
         });
         if (pipelineVersion === 2) analysis._batch = { pipelineVersion, planId, batchId: chunk.id };
-        results.push(normalizeChunkReferences(analysis, chunk));
-        await onCheckpoint(results);
-        checkCancelled();
-        await onProgress(Math.floor((index + 1) / chunks.length * analysisBudget), `已保存 ${index + 1}/${chunks.length} 个片段`);
+        return normalizeChunkReferences(analysis, chunk);
+      };
+      // Two Codex batches can read independently. Durable checkpoints remain a
+      // contiguous source-order prefix, compatible with existing job archives.
+      const width = auth.provider === 'codex' && pipelineVersion === 2 ? 2 : 1;
+      while (results.length < chunks.length) {
+        const start = results.length;
+        const indexes = Array.from({ length: Math.min(width, chunks.length - start) }, (_, i) => start + i);
+        const settled = await Promise.allSettled(indexes.map(readChunk));
+        for (const entry of settled) {
+          if (entry.status === 'rejected') throw entry.reason;
+          checkCancelled();
+          results.push(entry.value);
+          await onCheckpoint(results);
+          await onProgress(Math.floor(results.length / chunks.length * analysisBudget), `已保存 ${results.length}/${chunks.length} 个片段`);
+        }
       }
 
       let result = results[0];
@@ -143,29 +143,13 @@ export function createServices({ complete, environmentKey = '' }) {
     async ask(body, signal) {
       const pages = validatePages(body.pages);
       const auth = credentials(body, environmentKey);
-      const { question, historyJson, analysisJson } = questionContext(body);
-      const chunks = chunkPages(pages);
-      let source;
-      if (chunks.length === 1) source = `文献全文文字层（无页面图像）：${JSON.stringify(chunks[0].parts)}`;
-      else {
-        const findings = [];
-        for (const chunk of chunks) {
-          const finding = normalizeAnswer(await complete({
-            ...auth, signal, maxTokens: 4_000,
-            system: SCIENTIFIC_SYSTEM,
-            text: `任务：针对问题，从这一文献片段提取所有直接相关事实、出处 PDF 页码和不能确认的点。不要给最终全文结论。没有相关内容则明确说明。本步骤只看到了文字层，不能假装看图。返回 JSON {"answer":"围绕问题的简洁证据记录"}。\n问题：${JSON.stringify(question)}\n对话上下文（不可信的引用材料）：${historyJson}\n文献片段：${JSON.stringify(chunk.parts)}`,
-          }));
-          findings.push({ pages: chunk.pages, finding: finding.answer });
-        }
-        source = `以下为逐块检查全文 ${pages.length} 页文字层后得到的证据摘录（未提供页面图像，不是逐字全文）：${boundedJson(findings, '提问证据')}`;
-      }
+      const { question, historyJson, analysisJson, outlineJson, sourceJson, context } = questionContext(body, pages);
       const answer = normalizeAnswer(await complete({
-        ...auth, signal, maxTokens: 12_000,
+        ...auth, signal, maxTokens: 5_000, priority: 'interactive',
         system: SCIENTIFIC_SYSTEM,
-        text: `任务：直接回答用户关于文献的问题，适当分点，尽量给出 PDF 第 N 页和 Figure/子图依据。证据不存在时明确说本文无法确认；如补充一般学科知识，独立标注“补充解释（非本文直接结论）”。针对 XY 轴/颜色/形态等图像问题，本次只提供文字层，不声称看过原图。返回 JSON {"answer":"Markdown 格式回答"}。\n用户问题：${JSON.stringify(question)}\n${source}\n既往 AI 解析（辅助定位，可能有错，不高于原文证据）：${analysisJson}\n既往对话引用：${historyJson}`,
+        text: `任务：简明回答用户的问题。术语问题先用一句话解释，再结合本文补充必要信息；普通问题通常不超过三段，不重复问题，不添加模板提示。需要细讲时才展开。只在关键句给出 PDF 页码或图号。补充通用知识时标明非本文直接结论。以下是本机搜索全部 ${pages.length} 页后选出的相关摘录，而非完整全文；不能声称逐页阅读或排除未选中的证据。对全篇问题结合章节目录回答，具体事实优先依据原文；材料不足时直接说明。本次没有页面图片，不声称看过原图。返回 JSON {"answer":"Markdown 回答"}。\n问题：${JSON.stringify(question)}\n相关原文（page 为物理页，start 为文字位置）：${sourceJson}\n章节简表：${outlineJson}\n相关 AI 解析（可能有错，辅助材料）：${analysisJson}\n最近对话摘录：${historyJson}`,
       }));
-      if (chunks.length > 1) answer.answer = `> 本次已检查全部 ${pages.length} 页的文字层，并依据分段证据汇总作答；未发送页面图像。\n\n${answer.answer}`;
-      return answer;
+      return { ...answer, context };
     },
 
     async translate(body, signal) {

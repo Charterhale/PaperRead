@@ -36,9 +36,9 @@ type PdfViewerProps = {
   onAppendHighlights?:(items:PdfHighlight[])=>Promise<boolean>;
 };
 
-function PdfPage({ doc, number, size, scale, rotation, root, query, highlights, crop, target }: {
+export function PdfPage({ doc, number, size, scale, rotation, root, query, highlights, crop, target, retain }: {
   doc: PDFDocumentProxy; number: number; size: PageSize; scale: number; rotation: number;
-  root: HTMLDivElement | null; query: string; highlights: Highlight[]; crop?: CropRegion; target?:CropRegion[];
+  retain: boolean; root: HTMLDivElement | null; query: string; highlights: Highlight[]; crop?: CropRegion; target?:CropRegion[];
 }) {
   const shell = useRef<HTMLDivElement>(null);
   const drawing = useRef<HTMLDivElement>(null);
@@ -48,6 +48,7 @@ function PdfPage({ doc, number, size, scale, rotation, root, query, highlights, 
   const [error, setError] = useState('');
   const [renderVersion, setRenderVersion] = useState(0);
   const [textView, setTextView] = useState('');
+  const [retry, setRetry] = useState(0);
   const turned = rotation % 180 !== 0;
   const width = (turned ? size.height : size.width) * scale;
   const height = (turned ? size.width : size.height) * scale;
@@ -63,18 +64,13 @@ function PdfPage({ doc, number, size, scale, rotation, root, query, highlights, 
     const canvasContainer = drawing.current, textHost = textContainer.current;
     if (!canvasContainer || !textHost) return;
     const release = (canvas: HTMLCanvasElement) => { canvas.width = 0; canvas.height = 0; };
-    if (!nearby) {
-      canvasContainer.querySelectorAll('canvas').forEach(release);
-      canvasContainer.replaceChildren(); textHost.replaceChildren();
-      setPainted(false); setTextView('');
-      return;
-    }
+    if (!nearby) return;
     let cancelled = false;
     let renderTask: RenderTask | undefined;
     let textLayer: TextLayer | undefined;
     const canvas = window.document.createElement('canvas');
     // Keep the last complete bitmap visible while the page geometry changes.
-    // Both new layers are prepared offscreen and installed together when ready.
+    // Replacement graphics are prepared offscreen; text is independent.
     const textElement = window.document.createElement('div');
     textElement.className = 'pdf-text-layer textLayer';
     setError('');
@@ -83,7 +79,8 @@ function PdfPage({ doc, number, size, scale, rotation, root, query, highlights, 
         const page = await doc.getPage(number);
         if (cancelled) return;
         const viewport = page.getViewport({ scale, rotation: (page.rotate + rotation) % 360 });
-        const density = Math.min(window.devicePixelRatio || 1, 2);
+        // Bound backing-store allocation even at 500% zoom on Retina displays.
+        const density = Math.min(window.devicePixelRatio || 1, 2, Math.sqrt(6_000_000 / (viewport.width * viewport.height)), 8192 / Math.max(viewport.width, viewport.height));
         canvas.width = Math.ceil(viewport.width * density);
         canvas.height = Math.ceil(viewport.height * density);
         canvas.style.width = '100%'; canvas.style.height = '100%';
@@ -91,22 +88,29 @@ function PdfPage({ doc, number, size, scale, rotation, root, query, highlights, 
         renderTask = page.render({ canvas, canvasContext: canvas.getContext('2d')!, viewport, transform: density !== 1 ? [density, 0, 0, density, 0, 0] : undefined });
         await renderTask.promise;
         if (cancelled) return;
-        const content = await page.getTextContent();
-        if (cancelled) return;
-        textElement.style.setProperty('--scale-factor', String(scale));
-        textElement.style.setProperty('--total-scale-factor', String(scale * viewport.userUnit));
-        textLayer = new TextLayer({ textContentSource: content, container: textElement, viewport });
-        await textLayer.render();
-        if (cancelled) return;
+        // Publish the bitmap immediately. A slow or broken text layer must not
+        // hide an otherwise readable scan or figure page.
         const previous = Array.from(canvasContainer.querySelectorAll('canvas'));
-        canvasContainer.replaceChildren(canvas); textHost.replaceChildren(textElement);
-        previous.forEach(release);
-        setPainted(true); setTextView(`${scale}/${rotation}`);
-        setRenderVersion(value => value + 1);
+        canvasContainer.replaceChildren(canvas); previous.forEach(release);
+        setPainted(true);
+        try {
+          const content = await page.getTextContent();
+          if (cancelled) return;
+          textElement.style.setProperty('--scale-factor', String(scale));
+          textElement.style.setProperty('--total-scale-factor', String(scale * viewport.userUnit));
+          textLayer = new TextLayer({ textContentSource: content, container: textElement, viewport });
+          await textLayer.render();
+          if (cancelled) return;
+          textHost.replaceChildren(textElement);
+          setTextView(`${scale}/${rotation}`);
+          setRenderVersion(value => value + 1);
+        } catch (cause) {
+          if (!cancelled) { textHost.replaceChildren(); setTextView(''); console.warn('PDF text layer unavailable', number, cause); }
+        }
       } catch (cause) {
-        if (!cancelled && !(cause instanceof Error && cause.name === 'RenderingCancelledException')) setError('这一页暂时无法显示，请尝试重新导入。');
+        if (!cancelled && !(cause instanceof Error && cause.name === 'RenderingCancelledException')) setError('页面未能显示');
       } finally {
-        if (cancelled) release(canvas);
+        if (cancelled && !canvas.isConnected) release(canvas);
       }
     };
     // Scaling the existing bitmap is immediate; high-resolution painting only
@@ -115,7 +119,14 @@ function PdfPage({ doc, number, size, scale, rotation, root, query, highlights, 
     return () => {
       cancelled = true; window.clearTimeout(timer); renderTask?.cancel(); textLayer?.cancel();
     };
-  }, [doc, number, scale, rotation, nearby]);
+  }, [doc, number, scale, rotation, nearby, retry]);
+
+  useEffect(() => {
+    if (nearby || retain) return;
+    drawing.current?.querySelectorAll('canvas').forEach(canvas => { canvas.width = 0; canvas.height = 0; });
+    drawing.current?.replaceChildren(); textContainer.current?.replaceChildren();
+    setPainted(false); setTextView('');
+  }, [nearby, retain]);
 
   useEffect(() => {
     const canvasContainer = drawing.current;
@@ -132,8 +143,8 @@ function PdfPage({ doc, number, size, scale, rotation, root, query, highlights, 
   return <div className={`pdf-page-wrap ${crop ? 'pdf-crop-active' : ''}`} data-pdf-page={number} ref={shell} style={{ width, height }}>
     <div className="pdf-page-drawing" ref={drawing} />
     {nearby && !painted && !error && <div className="pdf-page-loading"><LoaderCircle size={19} className="pdf-spin" /><span>载入第 {number} 页</span></div>}
-    {!nearby && <div className="pdf-page-placeholder">{number}</div>}
-    {error && <div className="pdf-page-loading pdf-page-error">{error}</div>}
+    {!nearby && !painted && <div className="pdf-page-placeholder">{number}</div>}
+    {error && <div className="pdf-page-loading pdf-page-error">{error}<button className="subtle-button" onClick={() => setRetry(value => value + 1)}>重试</button></div>}
     <div className="pdf-text-holder" ref={textContainer} style={{ visibility: textView === `${scale}/${rotation}` ? 'visible' : 'hidden' }} />
     <div className="pdf-highlights" aria-hidden="true">{highlights.filter(item => item.rotation === rotation).flatMap(item => item.rectangles.map((rect, index) => <div key={`${item.id}-${index}`} className="pdf-highlight-rect" style={{ backgroundColor: item.color || '#ffd735', left: `${rect.x * 100}%`, top: `${rect.y * 100}%`, width: `${rect.width * 100}%`, height: `${rect.height * 100}%` }} />))}</div>
     {crop && <div className="pdf-crop-region" style={{ left: `${crop.x * 100}%`, top: `${crop.y * 100}%`, width: `${crop.width * 100}%`, height: `${crop.height * 100}%` }}><span>松开鼠标，精读此图</span></div>}
@@ -220,13 +231,16 @@ const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(function PdfViewer
     void (async () => {
       try {
         const document = await task.promise;
-        const pageSizes: PageSize[] = [];
-        for (let i = 1; i <= document.numPages; i += 1) {
-          const p = await document.getPage(i);
-          const viewport = p.getViewport({ scale: 1 });
-          pageSizes.push({ width: viewport.width, height: viewport.height });
-          if (cancelled) return;
-        }
+        const pageSizes: PageSize[] = new Array(document.numPages);
+        let next = 1;
+        await Promise.all(Array.from({ length: Math.min(4, document.numPages) }, async () => {
+          while (!cancelled && next <= document.numPages) {
+            const index = next++;
+            const p = await document.getPage(index);
+            const viewport = p.getViewport({ scale: 1 });
+            pageSizes[index - 1] = { width: viewport.width, height: viewport.height };
+          }
+        }));
         if (cancelled) return;
         setDoc(document); setSizes(pageSizes); setLoading(false);
         // Force the controlled page effect to restore the new paper's position,
@@ -576,7 +590,7 @@ const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(function PdfViewer
       {loading && <div className="pdf-empty"><LoaderCircle size={28} className="pdf-spin" /><h3>正在打开原文</h3><p>提取页面与可选择的文字…</p></div>}
       {error && <div className="pdf-empty pdf-error"><FileText size={32} /><h3>暂时无法打开</h3><p>{error}</p></div>}
       {!data && !loading && <div className="pdf-empty"><div className="pdf-empty-icon"><FileText size={34} strokeWidth={1.3} /></div><h3>从一篇文献开始</h3><p>上传或拖入 PDF<br />原文与解析将在这里同步展开</p><span className="pdf-empty-hint">PDF · 可选择文字 · 页码联动</span></div>}
-      {doc && <div className="pdf-pages" style={{ minWidth: fit ? 0 : maxPageWidth * scale + 48 }}>{sizes.map((size, index) => <PdfPage key={index} doc={doc} number={index + 1} size={size} scale={scale} rotation={rotation} root={scrollRoot} query={query} highlights={highlights.filter(item => item.page === index + 1)} crop={cropDraft?.page === index + 1 ? cropDraft.region : undefined} target={target?.page===index+1?target.regions.map(r=>rotateRegion(r,rotation)):undefined} />)}</div>}
+      {doc && <div className="pdf-pages" style={{ minWidth: fit ? 0 : maxPageWidth * scale + 48 }}>{sizes.map((size, index) => <PdfPage key={index} doc={doc} retain={Math.abs(index + 1 - activePage) <= 2} number={index + 1} size={size} scale={scale} rotation={rotation} root={scrollRoot} query={query} highlights={highlights.filter(item => item.page === index + 1)} crop={cropDraft?.page === index + 1 ? cropDraft.region : undefined} target={target?.page===index+1?target.regions.map(r=>rotateRegion(r,rotation)):undefined} />)}</div>}
     </div>
     {notice && <div className="pdf-notice" role="status"><Check size={13} />{notice}</div>}
     {bookmarksOpen && <div className="pdf-bookmarks-popover"><div className="pdf-bookmarks-title"><strong>阅读标记</strong><button className="subtle-button" onClick={()=>{setBookmarksOpen(false);setAnnotationsOpen(true);}}>高亮与评论</button><button className="pdf-icon-button" aria-label="关闭阅读标记" onClick={() => setBookmarksOpen(false)}><X size={14} /></button></div>{!bookmarks.length && !highlights.length && <p>点击工具栏书签收藏页面，或划选文字添加高亮。</p>}{bookmarks.map(number => <div className="pdf-mark-row" key={`page-${number}`}><button onClick={() => { onBeforeNavigate?.();goToPage(number); setBookmarksOpen(false); }}><Bookmark size={13} />第 {number} 页</button><button className="pdf-icon-button" title="删除书签" aria-label={`删除第 ${number} 页书签`} onClick={() => setBookmarks(items => items.filter(item => item !== number))}><X size={12} /></button></div>)}{highlights.map(item => <div className="pdf-mark-row pdf-highlight-row" key={item.id}><button onClick={() => { onBeforeNavigate?.();if (rotation !== item.rotation) setRotation(item.rotation); goToPage(item.page); setBookmarksOpen(false); }}><Highlighter size={13} style={{ color: item.color || '#d5a923' }} /><span><small>第 {item.page} 页</small>{item.text}</span></button><input type="color" className="pdf-annotation-color" title="修改此标注颜色" aria-label="修改此标注颜色" value={item.color || '#ffd735'} onChange={event => setHighlights(items => items.map(other => other.id === item.id ? { ...other, color: event.target.value } : other))} /><button className="pdf-icon-button" title="删除高亮" aria-label="删除高亮" onClick={() => setHighlights(items => items.filter(other => other.id !== item.id))}><X size={12} /></button></div>)}</div>}

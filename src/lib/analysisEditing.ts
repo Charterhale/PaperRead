@@ -10,4 +10,28 @@ const templates:Record<Category,string[]>={
 };
 export function evidenceRows(category:Category,rows?:EvidenceRow[]):EvidenceRow[]{const existing=rows||[];return [...existing,...templates[category].filter(label=>!existing.some(r=>r.label===label)).map((label,i)=>({id:'template-'+i,label,value:''}))];}
 // Old generated boilerplate is hidden in reading/export; the editable source stays intact.
-export function readingText(text=''){return text.split(/\n\s*\n/).filter(p=>!/^\s*(?:#{1,6}\s*)?(?:\*\*)?(?:证据边界|带着边界理解结论|原文定位|PDF 原文位置)\s*[:：]?/.test(p)).join('\n\n').replace(/\s*[(（](?:原文\s*)?(?:p\.\s*\d+(?:[–-]\d+)?|第\s*\d+\s*页)[)）]/g,'');}
+export function readingText(text='') {
+ const label='(?:证据性质|证据边界|带着边界理解结论|原文定位|PDF\\s*原文位置)';
+ const tagged=new RegExp('^\\s*(?:[-*+]\\s+)?(?:\\*\\*)?'+label+'(?:\\*\\*)?\\s*(?:[:：]|$)');
+ const output:string[]=[];let hiddenLevel=0,inline=false,pendingParagraph=false,fenced=false;
+ for(const line of text.split('\n')) {
+  if(/^\s*(?:```|~~~)/.test(line)&&!hiddenLevel&&!inline){fenced=!fenced;output.push(line);continue;}
+  if(fenced){output.push(line);continue;}
+  const heading=/^\s*(#{1,6})\s+(.+?)\s*#*\s*$/.exec(line);
+  if(heading){
+   if(hiddenLevel&&heading[1].length>hiddenLevel)continue;
+   hiddenLevel=0;inline=false;pendingParagraph=false;
+   if(tagged.test(heading[2])){hiddenLevel=heading[1].length;continue;}
+   output.push(line);continue;
+  }
+  if(hiddenLevel)continue;
+  if(tagged.test(line)){
+   inline=true;
+   const plain=line.replace(/\*/g,'').replace(/^\s*[-+]\s+/,'').trim();
+   pendingParagraph=new RegExp('^'+label+'\\s*[:：]?\\s*$').test(plain);continue;
+  }
+  if(inline){if(!line.trim()){if(!pendingParagraph)inline=false;}else pendingParagraph=false;continue;}
+  output.push(line);
+ }
+ return output.join('\n').replace(/\n{3,}/g,'\n\n').trim().replace(/\s*[(（](?:原文\s*)?(?:p\.\s*\d+(?:[–-]\d+)?|第\s*\d+\s*页)[)）]/g,'');
+}

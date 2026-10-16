@@ -49,7 +49,19 @@ test('cancel stops the spawned process promptly',async()=>{
 });
 test('queued Codex request honours cancellation without starting a second inference',async()=>{
  let release,calls=0;const gate=new Promise(r=>release=r);const controller=new AbortController();const client=createCodexClient({executable:process.execPath,runner:async(...args)=>{if(args[1][0]==='exec'){calls++;await gate;}return fakeRunner({answer:'ok'})(...args);}});
- const first=client.complete({text:'one',system:'instructions'});const second=client.complete({text:'two',system:'instructions',signal:controller.signal});controller.abort();release();await first;await assert.rejects(second,{code:'REQUEST_CANCELLED'});assert.equal(calls,1);
+ const first=client.complete({text:'one',system:'instructions'});const second=client.complete({text:'two',system:'instructions',signal:controller.signal});const cancelled=assert.rejects(second,{code:'REQUEST_CANCELLED'});controller.abort();release();await first;await cancelled;assert.equal(calls,1);
+});
+test('two background reads reserve an independent interactive lane', async () => {
+ let release; const gate=new Promise(resolve=>release=resolve); const started=[];
+ const client=createCodexClient({executable:process.execPath,runner:async (...args)=>{
+  if(args[1][0]==='exec'){const name=args[2].input.includes('interactive-question')?'ask':args[2].input.includes('background-two')?'two':'one';started.push(name);if(name!=='ask')await gate;}
+  return fakeRunner({answer:'ok'})(...args);
+ }});
+ const one=client.complete({text:'background-one',priority:'background'}),two=client.complete({text:'background-two',priority:'background'});
+ for(let i=0;i<100&&started.length<2;i++)await new Promise(resolve=>setTimeout(resolve,5));
+ assert.deepEqual(started.sort(),['one','two']);
+ const interactive=await client.complete({text:'interactive-question'});
+ assert.equal(interactive.answer,'ok');assert(started.includes('ask'));release();await Promise.all([one,two]);
 });
 test('HTTP routing defaults UI to Codex; explicit DeepSeek stays manual; durable Codex job restores',async()=>{
  const dir=await mkdtemp(path.join(tmpdir(),'paperlens-provider-test-'));let deepseekCalls=0;

@@ -41,7 +41,7 @@ try {
   await expect(panel.locator('[data-panel-field="xAxis"]')).toBeHidden();
   passed.push('39 节长文默认只读当前节，结论先显示，长文与细节分层');
 
-  await panel.locator('.panel-detail-group').first().locator('summary').click();
+  await panel.locator('.panel-detail-group').first().locator(':scope > summary').click();
   await expect(panel.locator('[data-panel-field="xAxis"]')).toBeVisible();
   await expect(panel.locator('[data-panel-field="readout"]')).toContainText('readout 末尾标记');
   await page.getByTitle('下一节', { exact: true }).click(); await page.waitForTimeout(450);
@@ -107,7 +107,7 @@ try {
   await clickTool(page,'切换明暗主题'); await page.screenshot({ path: 'artifacts/reader-comfort-dark.png' }); await clickTool(page,'切换明暗主题');
   await panel.getByRole('button', { name: '编辑解析', exact: true }).click();
   await page.getByLabel('如何读这张图').fill('编辑后仍可完整展开查看。'); await page.getByRole('button', { name: '保存子图解析', exact: true }).click();
-  await panel.locator('.panel-detail-group').first().locator('summary').click();
+  await panel.locator('.panel-detail-group').first().locator(':scope > summary').click();
   await expect(panel.locator('[data-panel-field="readout"]')).toHaveText(/编辑后仍可完整展开查看/);
   await clickTool(page,'编辑历史与恢复'); await expect(page.locator('.revision-row')).toHaveCount(1); await page.getByTitle('关闭编辑历史').click();
   passed.push('子图编辑、版本恢复入口和全部明暗样式保持可用');

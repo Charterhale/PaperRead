@@ -64,12 +64,14 @@ export async function readCodexModels(executable) {
         }
       }
     });
-    send({id:1,method:'initialize',params:{clientInfo:{name:'paperread',title:'PaperRead',version:'0.6.1'}}});
+    send({id:1,method:'initialize',params:{clientInfo:{name:'paperread',title:'PaperRead',version:'0.7.1'}}});
   });
 }
 
 export function createCodexClient({ executable, runner = runCodexProcess, timeoutMs = 600_000, modelReader = readCodexModels } = {}) {
-  let tail = Promise.resolve(), modelCache, modelCacheAt=0;
+  let modelCache, modelCacheAt=0, connectionPromise, connectionAt=0;
+  const queues = { interactive: [], background: [] };
+  const running = { interactive: 0, background: 0 };
   async function models(){if(modelCache&&Date.now()-modelCacheAt<300_000)return modelCache;modelCache=await modelReader(executable);modelCacheAt=Date.now();return modelCache;}
   async function status() {
     try {
@@ -83,7 +85,8 @@ export function createCodexClient({ executable, runner = runCodexProcess, timeou
     }
   }
   async function execute({ system, text, images = [], signal, model='codex-auto', reasoningEffort='medium' }) {
-    const connection = await status();
+    if (!connectionPromise || Date.now() - connectionAt > 30_000) { connectionAt = Date.now(); connectionPromise = status(); }
+    const connection = await connectionPromise;
     if (!connection.authenticated) throw new ApiError(401, 'CODEX_LOGIN_REQUIRED', connection.message);
     if (signal?.aborted) throw new ApiError(499, 'REQUEST_CANCELLED', '请求已取消。');
     if(model!=='codex-auto'){
@@ -132,10 +135,32 @@ export function createCodexClient({ executable, runner = runCodexProcess, timeou
       } catch { throw new ApiError(502, 'INVALID_AI_JSON', 'Codex 返回的文档结构无法读取，未保存不完整结果。'); }
     } finally { await rm(directory, { recursive: true, force: true }); }
   }
+  function drain() {
+    for (const lane of ['interactive', 'background']) {
+      const limit = lane === 'interactive' ? 1 : 2;
+      while (queues[lane].length && running[lane] < limit) {
+        const item = queues[lane].shift();
+        item.request.signal?.removeEventListener('abort', item.abort);
+        if (item.request.signal?.aborted) { item.reject(new ApiError(499, 'REQUEST_CANCELLED', '请求已取消。')); continue; }
+        running[lane]++;
+        execute(item.request).then(item.resolve, item.reject).finally(() => { running[lane]--; drain(); });
+      }
+    }
+  }
   function complete(request) {
-    const work = tail.catch(() => {}).then(() => execute(request));
-    tail = work.catch(() => {});
-    return work;
+    const lane = request.priority === 'background' ? 'background' : 'interactive';
+    return new Promise((resolve, reject) => {
+      const item = { request, resolve, reject, abort: null };
+      item.abort = () => {
+        const index = queues[lane].indexOf(item);
+        if (index < 0) return;
+        queues[lane].splice(index, 1);
+        reject(new ApiError(499, 'REQUEST_CANCELLED', '请求已取消。'));
+      };
+      if (request.signal?.aborted) return reject(new ApiError(499, 'REQUEST_CANCELLED', '请求已取消。'));
+      request.signal?.addEventListener('abort', item.abort, { once: true });
+      queues[lane].push(item); drain();
+    });
   }
   return { complete, status, models };
 }

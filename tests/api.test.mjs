@@ -145,17 +145,25 @@ test('figure detail preserves the requested id and page while providing a real i
   });
 });
 
-test('question answering checks every long-paper chunk before final synthesis', async () => {
+test('long-paper questions use one bounded retrieval request and retain relevant late-page evidence', async () => {
   const calls = [];
-  await withServer(async (_, options) => { calls.push(JSON.parse(options.body)); return response({ answer: '证据见 PDF 第 1 页。' }); }, async ({ post }) => {
-    const pages = ['A'.repeat(30_000), 'B'.repeat(30_000)];
-    const result = await post('ask', { ...request, pages, analysis: analysis(), question: '研究能证明因果吗？', messages: [] });
+  await withServer(async (_, options) => { calls.push(JSON.parse(options.body)); return response({ answer: 'DLPFC 是背外侧前额叶皮层。' }); }, async ({ post }) => {
+    const pages = Array.from({ length: 20 }, () => 'Unrelated methods and routine background. '.repeat(500));
+    pages[19] += 'Dorsolateral prefrontal cortex (DLPFC) is the brain region sampled in this study.';
+    const existing = analysis(); existing.sections[0].markdown = '详细旧解析'.repeat(100000);
+    existing.sections[0].figures[0].panels[0].image = 'DO-NOT-SEND-IMAGE'.repeat(1000);
+    const before = JSON.stringify(existing);
+    const result = await post('ask', { ...request, pages, analysis: existing, question: 'DLPFC是什么？', messages: [{ role: 'assistant', content: '旧长回答'.repeat(10000) }] });
     assert.equal(result.status, 200);
     const answer = await result.json();
-    assert.equal(calls.length, 3);
-    assert(calls[0].messages[1].content.includes(pages[0]));
-    assert(calls[1].messages[1].content.includes(pages[1]));
-    assert.match(answer.answer, /已检查全部 2 页/);
+    assert.equal(calls.length, 1);
+    const prompt = calls[0].messages[1].content;
+    assert(prompt.includes('Dorsolateral prefrontal cortex (DLPFC)'));
+    assert(prompt.length < 85000);
+    assert(!prompt.includes('DO-NOT-SEND-IMAGE'));
+    assert(answer.context.pages.includes(20));
+    assert(!answer.answer.includes('已检查全部'));
+    assert.equal(JSON.stringify(existing), before);
   });
 });
 

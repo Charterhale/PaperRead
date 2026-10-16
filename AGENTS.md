@@ -1,21 +1,17 @@
-# PaperRead update workflow
+# PaperRead workflow
 
 Follow the parent project instructions; synced `sources/` files are read-only.
 
-The user explicitly requests that every PaperRead update also sync the source,
-fresh screenshots and macOS installation package to
-`https://github.com/Charterhale/PaperRead`. Keep the repository PRIVATE at all times.
-Verify visibility before upload and after completion. Never switch it to public.
+The user explicitly requested publication of PaperRead to the public repository
+`https://github.com/Charterhale/PaperRead` on 2026-10-16. This supersedes the earlier
+private-only and no-upload instructions for this publication. Future uploads
+should follow the user's latest request; do not infer a recurring sync task.
 
-- Test the changed behavior and preserve existing analyses, notes, highlights,
-  links, reading positions, folds and backups.
-- Capture screenshots using the isolated synthetic demo library, never the
-  user's actual library. Include them in the README.
-- Exclude credentials, personal PDFs, notes, highlights, backups, background job
-  data and local verification artifacts from source and installation packages.
-- Upload the checked source; publish the matching version's signed macOS ZIP,
-  guide and SHA-256 file in this private repository's Releases. Retain prior releases.
-- Verify uploaded file contents and installation package digest. Report the
-  private repository and release links, and any concrete upload blocker honestly.
-
-This is standing user authorization for updates to this specific PRIVATE repository.
+- Prioritize clean typography and a clear reading hierarchy. Keep Introduction
+  and each original Results subsection; consolidate brief methods at the end.
+- Preserve analyses, notes, highlights, figures, links, folds, reading positions
+  and backups. Do not rewrite user-owned reading data for display changes.
+- Test changed behavior and capture screenshots with isolated synthetic data.
+- Exclude credentials, personal PDFs, notes, highlights, backups, background jobs,
+  local profiles and verification snapshots from source and release packages.
+- Verify the source version and package version match. Retain existing releases.

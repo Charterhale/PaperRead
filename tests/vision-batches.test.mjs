@@ -15,6 +15,21 @@ function result(pages = [1], length = 10) {
 function partsIn(text) { return JSON.parse(text.slice(text.indexOf('part/totalParts 表示单页分段：\n') + 'part/totalParts 表示单页分段：\n'.length)); }
 const synthesis = { title: 'Merged', subtitle: '', overview: '完整总览', orderedSectionIds: [], limitations: [] };
 
+test('Codex reads two independent batches concurrently without changing checkpoint or page order', async () => {
+  let active=0,peak=0;const saved=[];
+  const body={...bodyFor(13),provider:'codex',model:'codex-auto'};
+  const service=createServices({complete:async request=>{
+    if(!request.text.startsWith('任务：解析文献'))return synthesis;
+    active++;peak=Math.max(peak,active);
+    await new Promise(resolve=>setTimeout(resolve,request.images[0].page===1?30:3));active--;
+    return result(request.images.map(image=>image.page));
+  }});
+  const merged=await service.analyze(body,undefined,{onCheckpoint:async values=>saved.push(values.map(value=>value._batch.batchId))});
+  assert.equal(peak,2);assert.deepEqual(saved,[['batch-1'],['batch-1','batch-2'],['batch-1','batch-2','batch-3']]);
+  assert.deepEqual(merged.sections.map(section=>section.page),Array.from({length:13},(_,i)=>i+1));
+  assert.equal(merged.sections.flatMap(section=>section.figures.flatMap(figure=>figure.panels)).length,26);
+});
+
 test('more than 24 image pages are accepted and each appears in exactly one bounded batch', async () => {
   const body = bodyFor(37), calls = [];
   const services = createServices({ complete: async request => { calls.push(request); return request.text.startsWith('任务：解析文献') ? result(request.images.map(image => image.page)) : synthesis; } });

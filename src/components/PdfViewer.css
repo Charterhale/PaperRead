@@ -21,3 +21,6 @@
 .pdf-page-drawing{overflow:hidden;contain:paint}.pdf-page-drawing canvas{width:100%;height:100%}.pdf-text-holder{position:absolute;inset:0;overflow:clip;z-index:2}
 
 .pdf-pointer-mode,.pdf-pointer-mode .pdf-text-layer span{cursor:default}.pdf-pointer-mode .pdf-text-layer{user-select:none;-webkit-user-select:none}.pdf-viewer:focus{outline:none}
+
+/* Failed page retries remain clickable above the non-interactive loading layer. */
+.pdf-page-error{gap:12px;z-index:4}.pdf-page-error button{pointer-events:auto}

@@ -40,7 +40,8 @@ try {
   const panel = page.locator('.reader-section:not([hidden]) .reader-panel').first();
   await expect(panel).not.toHaveAttribute('open', '');
   await panel.locator(':scope > summary').click();
-  await expect(panel.locator('[data-panel-field="question"]')).toBeVisible();
+  await expect(panel.locator('[data-panel-field="question"]')).toBeHidden();
+  await expect(panel.locator('.panel-essentials')).toBeVisible();
   await clickTool(page, '切换明暗主题');
   await page.screenshot({ path: 'artifacts/calm-layout-dark.png' });
   await clickTool(page, '切换明暗主题');
