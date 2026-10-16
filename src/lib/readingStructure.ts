@@ -18,6 +18,7 @@ const commonTitles: [RegExp, string][] = [
 /** Display only: the original title, section IDs and analysis remain untouched. */
 export function chineseTitle(title: string, fallback = '研究结果'): string {
   const text = title.replace(/^\s*\d+(?:\.\d+)*[.、\s]+/, '').trim();
+  if (/^(?:研究背景|引言|introduction)(?:\s*[（(][\s\S]*[)）])?$/i.test(text)) return '研究背景';
   const known = commonTitles.find(([pattern]) => pattern.test(text));
   if (known) return known[1];
   // Chinese followed by an English gloss (including parentheses across lines).
@@ -26,7 +27,7 @@ export function chineseTitle(title: string, fallback = '研究结果'): string {
     const chineseGloss = /[（(]([^()（）]*[\p{Script=Han}][^()（）]*)[)）]/u.exec(text);
     const before = text.split(/[（(]/)[0];
     const value = !han.test(before) && chineseGloss ? chineseGloss[1] : withoutEnglishGloss;
-    return value.replace(/(?:(?:Extended\s+Data|Supplementary)\s+)?(?:Fig(?:ure)?\.?|Table)\s*\d+[a-z]?(?:\s*[–−-]\s*(?:\d+)?[a-z])?(?:\s*[,，]\s*(?:\d+)?[a-z](?:\s*[–−-]\s*(?:\d+)?[a-z])?)*/gi, '').replace(/\bFigures?\b/gi, '图').replace(/^[\s·:：,，-]+|[\s·:：,，-]+$/g, '').replace(/\s+/g, ' ').trim() || fallback;
+    return value.replace(/(?:(?:Extended\s+Data|Supplementary)\s+)?(?:Fig(?:ure)?\.?|Table)\s*\d+[a-z]?(?:\s*[–−-]\s*(?:\d+)?[a-z])?(?:\s*[,，、;；]\s*(?:\d+)?[a-z](?:\s*[–−-]\s*(?:\d+)?[a-z])?)*/gi, '').replace(/(?:[,，、]\s*)?(?:及|和|与)?(?:相关)?(?:延伸数据|扩展数据|补充图(?:表)?|相关补充图)\s*$/g, '').replace(/\bFigures?\b/gi, '图').replace(/^[\s·:：,，-]+|[\s·:：,，-]+$/g, '').replace(/\s+/g, ' ').trim() || fallback;
   }
   return fallback;
 }
@@ -38,7 +39,7 @@ export function isMethodSection(section: Section): boolean {
   return isMethodTitle(section.title) || isMethodTitle(section.shortTitle);
 }
 export function sectionTitle(section: Section): string {
-  return chineseTitle(section.title, chineseTitle(section.shortTitle, isMethodSection(section) ? '研究方法' : '研究结果'));
+  const short=continuationTitle(section.shortTitle);return chineseTitle(section.title, short.continuation&&!short.base?(isMethodSection(section)?'研究方法':'研究结果'):chineseTitle(section.shortTitle,isMethodSection(section)?'研究方法':'研究结果'));
 }
 /** Only whole administrative headings qualify; scientific uses of references do not. */
 export function isBackMatterTitle(title: string): boolean {
@@ -53,6 +54,7 @@ export function isBackMatterSection(s: Section): boolean {
 }
 export function continuationTitle(title: string): { continuation: boolean; base: string } {
   const text = title.replace(/^\s*\d+(?:\.\d+)*[.、\s]+/, '').trim();
+  if (/^(?:discussion|讨论)(?=$|[\s(/（:：与])/i.test(text)) return {continuation:true,base:'讨论'};
   const generic = /^(?:[（(]?(?:续(?:文|篇|接|上|下)?|接上(?:文|页)|continued|continuation|cont\.?|片段(?:末尾|开头)?可见部分|片段续文)[\s\d一二三四五六七八九十]*[)）]?)$/i;
   if (generic.test(text.replace(/[()（）]/g, ''))) return { continuation: true, base: '' };
   const suffix = /(?:\s*[（(]\s*(?:续|continued|cont\.?)[\s\d一二三四五六七八九十]*\s*[)）]|\s*[—–:：-]?\s+(?:续|continued|cont\.?)[\s\d]*)$/i;
@@ -90,7 +92,8 @@ export function sourceReadingGroups(sections: Section[]): ReadingGroup[] {
 
 /** Keep the paper's Results subsections in order; combine only real continuations and methods. */
 export function readingGroups(sections: Section[], _category?: Category): ReadingGroup[] {
-  return sourceReadingGroups(sections);
+  const groups=sourceReadingGroups(sections),discussion=(g:ReadingGroup)=>/^(?:discussion|讨论)(?=$|[\s(/（:：与])/i.test(g.title);
+  return [...groups.filter(g=>!g.methods&&!discussion(g)),...groups.filter(discussion),...groups.filter(g=>g.methods)];
 }
 
 export function chapterSummary(group: ReadingGroup): string {
@@ -101,9 +104,16 @@ export function chapterSummary(group: ReadingGroup): string {
   }).join(' ');
 }
 
+/** Structural headings excluded from the result-only route, without changing sections. */
+export function isResultSection(section: Section): boolean {
+  if (isMethodSection(section) || isBackMatterSection(section)) return false;
+  const title = section.title.trim().replace(/^\d+(?:\.\d+)*[.、\s]+/, '');
+  return !/^(?:实验设计|研究设计|数据预处理|数据来源|研究背景|研究缺口|研究问题|背景与|背景|引言|摘要|文章概览|讨论|结论|研究结论|研究总结|研究局限|局限性|limitations?\b|reporting\b|报告摘要|报告表|funding\b|经费支持|competing interests\b|利益声明|利益冲突|additional information\b|附加信息|open access\b|开放获取声明|方法与补充|补充(?:材料|方法|结果|图|说明)|延伸数据|扩展数据|introduction\b|background\b|abstract\b|summary\b|discussion\b|conclusions?\b|supplement(?:ary)?\b|extended data\b|data availability\b|code availability\b|数据获取|代码获取)/i.test(title);
+}
+
 /** Project saved nodes and custom edges onto reading groups without editing them. */
 export function readingLogic(analysis: Analysis, logic: {nodes: LogicNode[]; edges: LogicEdge[]; mainNodeIds?: string[]}) {
-  const groups = readingGroups(analysis.sections, analysis.category), nodes: LogicNode[] = [], mapping = new Map<string, string>();
+  const groups = readingGroups(analysis.sections, analysis.category).filter(group => !group.methods && isResultSection(group.sections[0])), nodes: LogicNode[] = [], mapping = new Map<string, string>();
   for (const group of groups) {
     const members = logic.nodes.filter(n => group.sections.some(s => s.id === n.sectionId));
     if (!members.length) continue;

@@ -13,7 +13,7 @@ const passed = [], errors = [];
 page.on('pageerror', e => errors.push(e.message));
 await page.route('**/api/**', r => r.fulfill({ json: { jobs: [], records: [], models: [], items: [], available: true, authenticated: true } }));
 try {
-  await page.goto(origin); await page.waitForSelector('.reader-section');
+  await page.goto(origin); await page.waitForSelector('.library-home');await page.getByRole('button',{name:'正在阅读',exact:true}).first().click();await page.getByRole('button',{name:'示例文献',exact:true}).click();await page.waitForSelector('.reader-section');
   const original = await page.evaluate(async () => {
     const { demoPaper } = await import('/src/lib/demo.ts');
     const p = structuredClone(demoPaper); p.analysisEdited = true; p.notes = '# 我的笔记\n\n保留原有研究想法';
@@ -31,7 +31,7 @@ try {
     localStorage.setItem('paperlens-pdf-test-annotations', JSON.stringify({ highlights: [{ id: 'old', color: '#ffd735', text: '原有高亮', rectangles: [{ x: .1, y: .2, width: .2, height: .05 }] }] }));
     return p;
   });
-  await page.reload(); await page.waitForSelector('.pdf-page-drawing canvas');
+  await page.reload();await page.waitForSelector('.library-home');await page.getByRole('button',{name:'正在阅读',exact:true}).first().click();await page.getByRole('button',{name:'示例文献',exact:true}).click(); await page.waitForSelector('.pdf-page-drawing canvas');
   await page.getByLabel('选择阅读小节').selectOption('atlas');
   const section = page.locator('#section-atlas'), panel = section.locator('.reader-panel').first();
   await panel.locator(':scope>summary').click();
@@ -65,13 +65,13 @@ try {
   await page.getByLabel('选择阅读小节').selectOption('atlas');
   await page.getByRole('button', { name: '逐节阅读', exact: true }).click();
   if (await panel.getAttribute('open') === null) await panel.locator(':scope>summary').click();
-  await page.screenshot({ path: 'artifacts/v0.7.4-simple-reading-light.png' });
+  await page.screenshot({ path: 'artifacts/v0.8.0-simple-reading-light.png' });
   await clickTool(page, '切换明暗主题');
   await page.waitForTimeout(500);
   const graphics = await page.locator('[data-pdf-page="3"] .pdf-page-drawing canvas').evaluateAll(canvases => canvases.map(c => {const pixels=c.getContext('2d').getImageData(0,0,c.width,c.height).data;let ink=0;for(let i=0;i<pixels.length;i+=64)if(pixels[i]<220||pixels[i+1]<220||pixels[i+2]<220)ink++;return {width:c.width,height:c.height,ink};}));
   console.log('PDF graphics after theme change',graphics);
   assert.ok(graphics.some(c=>c.ink>100),'PDF bitmap must contain visible graphics after theme change');
-  await page.screenshot({ path: 'artifacts/v0.7.4-simple-reading-dark.png' });
+  await page.screenshot({ path: 'artifacts/v0.8.0-simple-reading-dark.png' });
   await page.setViewportSize({ width: 1200, height: 850 });
   await page.getByTitle('放大解析').click(); await page.getByTitle('放大解析').click();
   assert.ok(await page.locator('.analysis-scroll').evaluate(el => el.scrollWidth <= el.clientWidth + 1));
@@ -94,6 +94,6 @@ try {
   await expect(page.locator('.pdf-page-error')).toHaveCount(0); await page.waitForSelector('.pdf-page-drawing canvas');
   passed.push('PDF 在文字流等待或报错时先显示图像；500%缩放限制画布像素避免巨幅分配');
   assert.deepEqual(errors, []);
-  await writeFile('artifacts/v0.7.4-simple-reading-checks.json', JSON.stringify({ passed, errors }, null, 2));
+  await writeFile('artifacts/v0.8.0-simple-reading-checks.json', JSON.stringify({ passed, errors }, null, 2));
   console.log(JSON.stringify({ passed, errors }, null, 2));
-} catch(error) { await page.screenshot({path:'artifacts/v0.7.4-simple-reading-error.png'}); console.error('ERRORS',errors,'URL',page.url(),'CONTENT',(await page.locator('body').innerText()).slice(0,6000)); throw error; } finally { await browser.close(); await server.close(); }
+} catch(error) { await page.screenshot({path:'artifacts/v0.8.0-simple-reading-error.png'}); console.error('ERRORS',errors,'URL',page.url(),'CONTENT',(await page.locator('body').innerText()).slice(0,6000)); throw error; } finally { await browser.close(); await server.close(); }

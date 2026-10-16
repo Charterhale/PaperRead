@@ -12,7 +12,7 @@ const app = await electron.launch({
 });
 try {
   const win = await app.firstWindow();
-  await win.waitForSelector('.pdf-page-wrap canvas');
+  await win.waitForSelector('.library-home');await win.screenshot({path:'docs/screenshots/library-home.png'});await win.getByRole('button',{name:'示例文献',exact:true}).click();await win.waitForSelector('.pdf-page-wrap canvas');
   await win.getByRole('button', { name: '逐节阅读', exact: true }).click();
   if (await win.locator('.reader-route').getAttribute('open') === null)
     await win.locator('.reader-route > summary').click();

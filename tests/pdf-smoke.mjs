@@ -65,7 +65,7 @@ try {
   await page.waitForSelector('[data-pdf-page="1"] .pdf-text-layer span');
   assert.equal(await page.getByRole('button', { name: '收藏当前页', exact: true }).getAttribute('aria-pressed'), 'true');
   assert.ok(await page.locator('.pdf-highlight-rect').count() > 0);
-  await page.locator('.pdf-statusbar button').click();
+  await page.getByRole('button',{name:'阅读标记',exact:true}).click();
   assert.equal(await page.locator('.pdf-mark-row').count(), 2);
   await page.getByRole('button', { name: '删除高亮', exact: true }).click();
   await page.getByRole('button', { name: '删除第 1 页书签', exact: true }).click();

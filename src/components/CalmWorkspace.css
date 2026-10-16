@@ -19,7 +19,7 @@
 .calm-workspace .last-read-date{display:none}.calm-workspace .paper-item{padding:10px 8px}
 .calm-workspace .demo-item{border:0;box-shadow:none;background:transparent;opacity:.8}.calm-workspace .library-bottom{padding:9px 0;min-height:48px}
 .library-settings-button{width:100%;display:flex;align-items:center;gap:10px;border-radius:7px;padding:9px;color:var(--subtle);font-size:12px}
-.library-settings-button:hover{background:var(--surface-3)}.settings-edge{position:fixed;left:10px;bottom:9px;z-index:20;background:var(--panel);border:1px solid var(--border)}
+.library-settings-button:hover{background:var(--surface-3)}
 .calm-workspace .panel-heading{height:44px;min-height:44px;padding:0 12px}.calm-workspace .segmented button{font-size:11px;padding:6px 10px}
 .calm-workspace .reader-tools{padding:5px 12px;min-height:36px}.calm-workspace .reader-section-switcher{min-height:36px;padding:4px 12px}
 .calm-workspace .pdf-document-picker{min-height:36px;padding:5px 12px}.calm-workspace .pdf-document-picker select{font-size:11px}.calm-workspace .pdf-toolbar{padding:7px 10px}

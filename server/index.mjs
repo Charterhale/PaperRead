@@ -1,4 +1,9 @@
 import express from 'express';
+import {createAuthorProfileService} from './author-profile.mjs';
+import {createPaperPostHandoff} from './handoff.mjs';
+import {createIntegrityService} from './integrity.mjs';
+import {createDocumentStore} from './documents.mjs';
+import { createBibliographyService, matchJournal, journalSource } from './bibliography.mjs';
 import { createBackupStore } from './backups.mjs';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
@@ -40,6 +45,7 @@ function localRequestGuard(production) {
 export function createApp({
   fetchImpl = globalThis.fetch,
   codexOptions = {},
+  metadataFetchImpl = fetchImpl,
   apiKey = process.env.DEEPSEEK_API_KEY || '',
   timeoutMs = 150_000,
   totalTimeoutMs = 15 * 60_000,
@@ -51,6 +57,10 @@ export function createApp({
   jobDir = path.join(ROOT, '.paperlens-jobs'),
   maxConcurrentJobs = 1,
   backupDir = path.join(ROOT, '.paperlens-backups'),
+  documentDir = path.join(ROOT, '.paperread-documents'),
+  openDocumentFolder = async () => {},
+  handoffDir = path.join(ROOT,'.paperread-outbox'),
+  launchPaperPost = async () => {},
 } = {}) {
   const app = express();
   app.disable('x-powered-by');
@@ -68,6 +78,8 @@ export function createApp({
   app.get('/api/backups',async(req,res)=>res.json({items:await backups.list(),directory:backups.directory}));
   app.get('/api/backups/:id',async(req,res)=>{res.type('application/gzip').send(await backups.read(req.params.id));});
   app.post('/api/backups',express.raw({type:'application/gzip',limit:'1gb'}),async(req,res)=>{res.status(201).json(await backups.save(req.body,Number(req.query.keep||7)));});
+  const documents=createDocumentStore(documentDir);
+  app.post('/api/documents/:id/pdf',express.raw({type:'application/pdf',limit:'150mb'}),async(req,res)=>res.json(await documents.savePdf(req.params.id,req.body)));
   app.use('/api', (req, res, next) => {
     if (req.method === 'POST' && !req.is('application/json')) return next(new ApiError(415, 'JSON_REQUIRED', '接口只接受 JSON 请求。'));
     next();
@@ -78,6 +90,23 @@ export function createApp({
     if (req.method === 'POST' && (!req.body || typeof req.body !== 'object' || Array.isArray(req.body))) return next(new ApiError(400, 'INVALID_INPUT', '请求内容必须是 JSON 对象。'));
     next();
   });
+  const handoff=createPaperPostHandoff({directory:handoffDir,documents,launch:launchPaperPost});
+  app.post('/api/handoff/paperpost',async(req,res)=>res.json(await handoff(req.body)));
+  app.get('/api/documents/:id/source',async(req,res)=>res.type('text/markdown').send(await documents.readSource(req.params.id)));
+  app.post('/api/documents/:id/sync',async(req,res)=>res.json(await documents.sync(req.params.id,req.body,{ocr:req.body.ocr===true})));
+  app.get('/api/documents/:id',async(req,res)=>res.json(await documents.info(req.params.id)));
+  app.post('/api/documents/:id/open',async(req,res)=>{const info=await documents.info(req.params.id);if(!info)throw new ApiError(404,'DOCUMENT_NOT_FOUND','本地文献文件夹尚未生成');await openDocumentFolder(info.folder);res.json(info);});
+  app.delete('/api/documents/:id/pdf',async(req,res)=>{await documents.removePdf(req.params.id);res.json({ok:true});});
+  const integrity=createIntegrityService({fetchImpl:metadataFetchImpl});
+  app.post('/api/integrity/check',async(req,res)=>res.json(await integrity(req.body)));
+  const resolveMetadata=createBibliographyService({fetchImpl:metadataFetchImpl});
+  app.post('/api/metadata/resolve',async(req,res)=>res.json(await resolveMetadata(req.body)));
+  app.get('/api/journals/source',(_req,res)=>res.json(journalSource));
+  app.post('/api/journals/match',async(req,res)=>{
+    const rows=req.body.papers;
+    if(!Array.isArray(rows)||rows.length>100||rows.some(p=>!p||typeof p.id!=='string'||typeof p.journal!=='string'||p.id.length>200||p.journal.length>500||p.issns!==undefined&&(!Array.isArray(p.issns)||p.issns.length>10||p.issns.some(x=>typeof x!=='string'||x.length>20))))throw new ApiError(400,'INVALID_JOURNALS','期刊匹配请求格式错误');
+    res.json({source:journalSource, matches:Object.fromEntries(rows.map(p=>[p.id,matchJournal(p)]))});
+  });
   const deepseekComplete = createDeepSeekClient({ fetchImpl, timeoutMs });
   const codex = createCodexClient(codexOptions);
   const complete = request => request.provider === 'codex' ? codex.complete(request) : deepseekComplete(request);
@@ -85,7 +114,7 @@ export function createApp({
   app.get('/api/codex/status', async (req,res) => res.json(await codex.status()));
   app.post('/api/codex/check', async (req,res,next) => { try { const result = await codex.complete({ system:'只返回 JSON。', text:'这是连接测试，不含论文。返回 {"ok":true}。' }); res.json({ok:result.ok === true}); } catch(error) { next(error); } });
   const services = createServices({ complete, environmentKey: apiKey });
-  const jobs = createJobManager({ directory: jobDir, services, environmentKey: apiKey, concurrency: maxConcurrentJobs });
+  const jobs = createJobManager({ directory: jobDir, services, environmentKey: apiKey, concurrency: maxConcurrentJobs, documents });
   app.locals.jobs = jobs;
   let activeRequests = 0;
 
@@ -128,6 +157,8 @@ export function createApp({
     };
   }
 
+  const authorProfile=createAuthorProfileService({complete,fetchImpl:metadataFetchImpl,environmentKey:apiKey});
+  app.post('/api/authors/profile',endpoint(authorProfile));
   for (const name of ['analyze', 'ask', 'translate', 'figure']) app.post(`/api/${name}`, endpoint(services[name]));
   // Job creation returns immediately. Its lifetime belongs to the local app,
   // not to the HTTP connection or the currently selected paper.

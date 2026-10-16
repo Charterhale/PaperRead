@@ -13,7 +13,7 @@ const ID = /^[0-9a-f-]{36}$/;
 
 // The persisted record contains only an allowlisted paper input, completed
 // chunks, and a public status. Keys and abort controllers live in RAM only.
-export function createJobManager({ directory, services, environmentKey = '', concurrency = 1 }) {
+export function createJobManager({ directory, services, environmentKey = '', concurrency = 1, documents }) {
   const records = new Map();
   const secrets = new Map();
   const workers = new Map();
@@ -133,6 +133,8 @@ export function createJobManager({ directory, services, environmentKey = '', con
       if (closed || record.job.status !== 'queued') return;
       touch(record, { status: 'running', message: record.checkpoints.length ? '正在从已保存的片段继续' : '正在开始解析' });
       await persist(record);
+      // Persist the extracted source before the first model request.
+      if(documents)await documents.sync(record.job.paperId,{title:record.input.title||record.job.title,pages:record.input.pages});
       const result = await services.analyze({ ...record.input, apiKey: secrets.get(record.job.id) }, controller.signal, {
         checkpoints: record.checkpoints,
         onCheckpoint: async checkpoints => {
@@ -152,6 +154,7 @@ export function createJobManager({ directory, services, environmentKey = '', con
       // Publish completion only after the final document is durable. If a
       // cancellation arrives during the write, its later write wins and the
       // cancelled job is never changed back to completed in memory.
+      if(documents)await documents.result(record.job.paperId,result);
       await persist(completed);
       if (controller.signal.aborted || record.job.status !== 'running') return;
       record.job = completed.job;

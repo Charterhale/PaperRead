@@ -1,0 +1,230 @@
+/* PaperRead · system-style tools and translucent navigation; reading text remains opaque */
+.app.mac-workspace{font-family:-apple-system,BlinkMacSystemFont,'PingFang SC',sans-serif}
+.mac-workspace .titlebar{min-height:64px;height:64px;background:color-mix(in srgb,var(--surface) 75%,transparent);backdrop-filter:blur(28px) saturate(1.3);-webkit-backdrop-filter:blur(28px) saturate(1.3);border-bottom:1px solid color-mix(in srgb,var(--text) 8%,transparent)}
+.mac-workspace .titlebar .icon-btn,.mac-workspace .document-actions>.icon-btn{border-radius:50%;width:34px;height:34px;border:1px solid color-mix(in srgb,var(--text) 9%,transparent);background:color-mix(in srgb,var(--surface) 80%,transparent);box-shadow:inset 0 1px color-mix(in srgb,var(--surface) 95%,transparent),0 1px 4px color-mix(in srgb,var(--text) 3%,transparent)}
+.mac-workspace .titlebar .primary-button,.mac-workspace .workspace-focus-button{border-radius:20px;min-height:34px;padding:6px 13px;font-size:12px}.mac-workspace .reader-library-back{display:inline-flex;align-items:center;gap:7px;border-radius:20px;background:var(--surface-3);padding:8px 13px;font-size:12px;color:var(--text)}
+.mac-workspace .library,.mac-workspace .navigation{background:color-mix(in srgb,var(--surface-3) 65%,transparent);backdrop-filter:blur(24px) saturate(1.2);-webkit-backdrop-filter:blur(24px) saturate(1.2)}
+.mac-workspace .library-search{height:35px;border-radius:20px;background:color-mix(in srgb,var(--surface) 78%,transparent);border:1px solid color-mix(in srgb,var(--text) 9%,transparent);box-shadow:inset 0 1px 3px color-mix(in srgb,var(--text) 3%,transparent)}
+.mac-workspace .library-nav,.mac-workspace .nav-section{border-radius:9px}.mac-workspace .library-nav.selected{background:color-mix(in srgb,var(--text) 10%,transparent);color:var(--text)}.mac-workspace .library-nav>svg{color:var(--accent)}
+.mac-workspace .pdf-toolbar .icon-btn,.mac-workspace .panel-heading .icon-btn{border-radius:50%}.mac-workspace .question-box{border-radius:24px;background:color-mix(in srgb,var(--surface) 90%,transparent);border-color:color-mix(in srgb,var(--text) 13%,transparent);box-shadow:inset 0 1px 3px color-mix(in srgb,var(--text) 3%,transparent)}
+.mac-workspace .task-badge{background:#2d8c54;color:#fff;box-shadow:0 0 0 3px color-mix(in srgb,#2d8c54 13%,transparent)}
+.home-global-error{position:fixed;top:72px;left:230px;right:20px;z-index:25;border:1px solid var(--border);border-radius:12px;padding:12px 16px;background:var(--surface);box-shadow:var(--shadow);display:flex;align-items:center;gap:12px;font-size:12px}.home-global-error>button{margin-left:auto}
+.library-mode .settings-footer-button{display:none}
+
+/* Independent rounded panes retain the existing draggable splitters. */
+.mac-workspace .workspace{padding:7px;gap:0;background:var(--bg);min-height:0}.mac-workspace .main-area{min-width:0;min-height:0}.mac-workspace .document-bar{border-radius:15px;margin:0 0 7px;border:1px solid var(--border)}.mac-workspace .pdf-column,.mac-workspace .analysis-column,.mac-workspace .navigation{border-radius:16px;border:1px solid var(--border);overflow:hidden;min-height:0}.mac-workspace .navigation{display:flex;flex-direction:column}.mac-workspace .nav-scroll{min-height:0}.mac-workspace .resize-handle{width:8px;flex-shrink:0;touch-action:none}.mac-workspace .titlebar{margin:6px 7px 0;border-radius:16px;border:1px solid var(--border)}.home-toolbar{-webkit-app-region:drag}.home-toolbar button,.home-toolbar input,.home-toolbar a,.home-toolbar label{-webkit-app-region:no-drag}
+
+.reader-library-rail{min-height:0;display:flex;flex-direction:column;flex-shrink:0}.reader-library-rail>.library{flex:1;min-height:0;border-radius:16px;border:1px solid var(--border);overflow:hidden}.reader-library-rail>.reader-sidebar-brand{padding:8px 12px 13px;height:auto;flex-shrink:0}.reader-library-rail .reader-sidebar-brand svg{color:var(--accent)}
+/* Reader chrome uses the same floating glass surfaces as the library. */
+.mac-workspace .workspace{background:linear-gradient(135deg,color-mix(in srgb,var(--accent) 5%,transparent),transparent 52%),color-mix(in srgb,var(--surface-3) 42%,transparent)}
+.mac-workspace .main-area{background:transparent}
+.mac-workspace .navigation,.mac-workspace .reader-library-rail>.library{border-radius:18px;background:color-mix(in srgb,var(--surface-3) 57%,transparent);border:1px solid color-mix(in srgb,var(--surface) 78%,transparent);box-shadow:0 7px 22px color-mix(in srgb,var(--text) 6%,transparent),inset 0 1px color-mix(in srgb,var(--surface) 88%,transparent);backdrop-filter:blur(32px) saturate(1.35);-webkit-backdrop-filter:blur(32px) saturate(1.35)}
+.mac-workspace .navigation{margin:0 3px 3px 0}.mac-workspace .reader-library-rail>.library{margin-bottom:3px}
+.mac-workspace .analysis-column{background:var(--surface)}
+.mac-workspace .titlebar,.mac-workspace .document-bar{background:color-mix(in srgb,var(--surface) 78%,transparent);backdrop-filter:blur(28px) saturate(1.3);-webkit-backdrop-filter:blur(28px) saturate(1.3);box-shadow:inset 0 1px color-mix(in srgb,var(--surface) 90%,transparent)}
+.mac-workspace .document-actions,.mac-workspace .title-actions{gap:7px}
+.mac-workspace .pdf-icon-button{border-radius:50%;width:28px;height:28px;flex-shrink:0}.mac-workspace .pdf-icon-button:hover{background:color-mix(in srgb,var(--text) 7%,transparent)}
+.mac-workspace .pdf-tool-group{gap:3px}.mac-workspace .pdf-secondary-tools{padding:2px 5px;border-radius:20px;background:color-mix(in srgb,var(--surface-3) 58%,transparent);border:1px solid color-mix(in srgb,var(--text) 6%,transparent);box-shadow:inset 0 1px color-mix(in srgb,var(--surface) 80%,transparent)}
+.mac-workspace .pdf-searchbar,.mac-workspace .library-search{margin:7px 10px;border-radius:22px;background:color-mix(in srgb,var(--surface) 70%,transparent);border:1px solid color-mix(in srgb,var(--text) 11%,transparent);box-shadow:inset 0 1px 3px color-mix(in srgb,var(--text) 4%,transparent);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px)}
+.mac-workspace .pdf-searchbar input{background:transparent;min-width:0;border:0;box-shadow:none}
+.mac-workspace .question-box{border-radius:25px;backdrop-filter:blur(26px);-webkit-backdrop-filter:blur(26px);box-shadow:inset 0 1px color-mix(in srgb,var(--surface) 90%,transparent),0 3px 12px color-mix(in srgb,var(--text) 4%,transparent)}
+.mac-workspace .pdf-statusbar>span:first-child{display:none}
+.mac-workspace .nav-tabs{border:0;gap:3px;margin:0 12px 10px;padding:3px;border-radius:12px;background:color-mix(in srgb,var(--text) 5%,transparent)}
+.mac-workspace .nav-tabs>button{border:0;border-radius:9px;min-width:0;padding:7px 5px;font-size:10px}.mac-workspace .nav-tabs>button.active{background:color-mix(in srgb,var(--surface) 90%,transparent);box-shadow:0 1px 4px color-mix(in srgb,var(--text) 7%,transparent);color:var(--text)}
+[data-theme=dark] .mac-workspace .navigation,[data-theme=dark] .mac-workspace .reader-library-rail>.library{background:color-mix(in srgb,var(--surface-2) 65%,transparent);border-color:color-mix(in srgb,var(--text) 11%,transparent);box-shadow:0 8px 25px #0003,inset 0 1px color-mix(in srgb,var(--text) 7%,transparent)}
+/* Brand color is independent of the workspace accent, including monochrome. */
+.app{--paperread-brand:#7056c4;--paperread-brand-surface:#eee9fb}
+[data-theme=dark] .app{--paperread-brand:#b9a5ff;--paperread-brand-surface:#39304f}
+.app .home-sidebar-brand strong,.app .reader-sidebar-brand strong{color:var(--paperread-brand)}
+.app .home-sidebar-brand .home-logo{color:var(--paperread-brand);background:var(--paperread-brand-surface)}
+.app .reader-sidebar-brand>svg{color:var(--paperread-brand)}
+
+/* Continuous window chrome; the four reading surfaces share the workspace top edge. */
+.mac-workspace:not(.library-mode){--reader-chrome-inset:0px;background:var(--bg)}
+.desktop-shell .mac-workspace:not(.library-mode){--reader-chrome-inset:32px}
+.app.mac-workspace .titlebar{height:88px;min-height:88px;flex-shrink:0;margin:0;padding:var(--reader-chrome-inset) 18px 0;border:0;border-radius:0;background:transparent;box-shadow:none;backdrop-filter:none;-webkit-backdrop-filter:none;gap:10px}
+.mac-workspace .reader-toolbar-brand{display:flex;align-items:center;gap:9px;flex:0 0 auto;width:calc(var(--reader-library-width,220px) - 8px);padding:0 2px;font-size:20px;letter-spacing:-.7px;-webkit-app-region:drag}
+.reader-toolbar-brand strong{font-weight:720;white-space:nowrap}
+.reader-logo{display:grid;place-items:center;width:34px;height:34px;flex-shrink:0;border-radius:9px;background:var(--paperread-brand-surface);color:var(--paperread-brand)}
+.app.mac-workspace .titlebar .icon-btn,.app.mac-workspace .titlebar .action-menu>button,.mac-workspace .document-actions>.icon-btn,.mac-workspace .document-actions>.action-menu>button{width:36px;height:36px;min-height:36px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;padding:0;border:1px solid var(--border);background:color-mix(in srgb,var(--surface) 78%,transparent);box-shadow:inset 0 1px color-mix(in srgb,var(--surface) 90%,transparent),0 2px 5px color-mix(in srgb,var(--text) 3%,transparent)}
+.app.mac-workspace .titlebar .primary-button,.app.mac-workspace .titlebar .workspace-focus-button,.mac-workspace .reader-library-back{height:36px;min-height:36px;display:inline-flex;align-items:center;justify-content:center;padding:0 13px;border-radius:22px;font-size:12px}
+.mac-workspace .reader-library-back{border:1px solid var(--border);background:color-mix(in srgb,var(--surface) 78%,transparent)}
+.mac-workspace .document-bar{flex-shrink:0;min-height:56px;margin:0;padding:4px 18px 9px;border:0;border-radius:0;background:transparent;box-shadow:none;backdrop-filter:none;-webkit-backdrop-filter:none;-webkit-app-region:drag}
+.mac-workspace .document-bar button,.mac-workspace .document-bar a,.mac-workspace .document-bar select,.app.mac-workspace .titlebar a{-webkit-app-region:no-drag}
+.mac-workspace .document-heading strong{font-size:13px;line-height:1.5;-webkit-line-clamp:1;max-width:none}
+.mac-workspace .workspace{padding:0 8px 8px;background:transparent;align-items:stretch}
+.mac-workspace .reader-library-rail>.library,.mac-workspace .navigation{margin:0}
+.mac-workspace .reader-library-rail>.library{width:100%!important}
+.mac-workspace .document-actions{align-items:center}
+@media(max-width:1100px){.app.mac-workspace .titlebar .breadcrumb{display:none}}
+@media(max-width:800px){.app.mac-workspace .titlebar{padding-left:12px;padding-right:12px;gap:7px}.mac-workspace .reader-toolbar-brand{width:172px;font-size:18px}.mac-workspace .document-bar{padding-left:12px;padding-right:12px}}
+
+.app.mac-workspace .titlebar .reader-library-back{width:36px;min-width:36px;height:36px;padding:0;border-radius:50%}
+
+/* A readable window tint anchors the glass, independent of the desktop behind it. */
+.app.mac-workspace.library-mode .library-home{background:color-mix(in srgb,var(--bg) 96%,transparent)}
+:root[data-theme=dark] .app{--text:#f0f2f6;--subtle:#c1c7d1;--muted:#a7aebb;--border:#454c58;--glass:rgba(36,40,48,.94);color:var(--text)}
+:root[data-theme=dark][data-palette=monochrome] .app{--text:#f2f2f5;--subtle:#c7c7cf;--muted:#aaaab3;--border:#48484e;--surface:#262629;--surface-2:#222225;--surface-3:#333337;--bg:#1b1b1e}
+[data-theme=dark] .library-home .home-sidebar{background:color-mix(in srgb,var(--surface-3) 92%,transparent);border-color:var(--border);box-shadow:0 8px 24px #0003,inset 0 1px #ffffff0a}
+[data-theme=dark] .library-home{--home-glass:color-mix(in srgb,var(--surface-3) 94%,transparent);--home-rule:color-mix(in srgb,var(--text) 16%,transparent);--home-green:#8fd7a8;--home-green-soft:#243d30}
+[data-theme=dark] .library-home .home-title-meaning{font-size:12px}
+[data-theme=dark] .mac-workspace .navigation,[data-theme=dark] .mac-workspace .reader-library-rail>.library{background:color-mix(in srgb,var(--surface-3) 94%,transparent);border-color:var(--border)}
+[data-theme=dark] .mac-workspace .home-search{background:var(--surface-2);border-color:var(--border);color:var(--subtle)}
+[data-theme=dark] .mac-workspace .home-nav-item.is-selected{background:color-mix(in srgb,var(--text) 14%,var(--surface-3))}
+[data-theme=dark] .mac-workspace .home-paper-table tbody tr.is-selected td,[data-theme=dark] .mac-workspace .home-paper-table tbody tr.is-checked td{background:var(--accent-light)}
+.home-sidebar-actions{display:flex;align-items:center;gap:8px;padding:4px 6px 0}
+.home-sidebar-actions>button:last-child{margin-left:auto}
+.mac-workspace .library-bottom>.icon-btn{border-radius:50%;border:1px solid var(--border);background:var(--surface-2);width:34px;height:34px}
+/* One compact toolbar keeps the title and all direct actions on the same row. */
+.app.mac-workspace .titlebar>.document-heading{flex:1;min-width:80px}
+.app.mac-workspace .titlebar .document-heading strong{display:block;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;max-width:none;font-size:12px}
+.app.mac-workspace .titlebar .document-heading>div>span{font-size:10px;white-space:nowrap}
+.reader-toolbar-actions{display:flex;align-items:center;gap:7px;flex-shrink:0}
+.app.mac-workspace .reader-toolbar-actions .title-actions{margin-left:0;padding-left:7px;border-left:1px solid var(--border)}
+.app.mac-workspace .titlebar .workspace-focus-button,.app.mac-workspace .titlebar .official-link{width:36px;min-width:36px;height:36px;padding:0;border-radius:50%;font-size:0}
+.app.mac-workspace .titlebar .official-link svg{width:18px;height:18px}
+.app.mac-workspace .pdf-document-picker{min-height:34px;padding-top:2px;padding-bottom:2px;align-items:center}
+.app.mac-workspace .reader-mode-control>button{display:inline-flex;align-items:center;justify-content:center;padding:6px 8px;min-width:30px}
+.app.mac-workspace .navigation .nav-tabs{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:2px;padding:3px;margin:0 10px 10px;border:0;border-radius:12px;background:color-mix(in srgb,var(--text) 7%,transparent);min-width:0}
+.app.mac-workspace .navigation .nav-tabs>button{display:flex;align-items:center;justify-content:center;gap:4px;width:100%;min-width:0;height:32px;padding:4px 3px;border:0;border-radius:9px;background:transparent;color:var(--subtle);font-size:11px;box-shadow:none;white-space:nowrap}
+.app.mac-workspace .navigation .nav-tabs>button.active{background:var(--surface);color:var(--text);box-shadow:0 1px 3px #0002;font-weight:600}
+.app.mac-workspace .navigation .nav-tabs>button::after{display:none;content:none}
+@media(max-width:1200px){.app.mac-workspace .reader-toolbar-brand{width:172px}.app.mac-workspace .reader-toolbar-actions{gap:4px}.app.mac-workspace .reader-toolbar-actions .document-actions,.app.mac-workspace .reader-toolbar-actions .title-actions{gap:4px}}
+/* Both surfaces inherit the management sidebar's typography, glass and spacing. */
+.app.mac-workspace .home-sidebar{--home-rule:color-mix(in srgb,var(--text) 9%,transparent);--home-sidebar:color-mix(in srgb,var(--surface-3) 72%,transparent);--home-glass:color-mix(in srgb,var(--surface) 77%,transparent);--home-highlight:color-mix(in srgb,var(--surface) 92%,transparent);padding:13px 10px 10px;border-radius:18px;border:1px solid color-mix(in srgb,var(--surface) 70%,transparent);background:color-mix(in srgb,var(--surface-3) 58%,transparent);box-shadow:0 8px 26px color-mix(in srgb,var(--text) 8%,transparent),inset 0 1px 1px color-mix(in srgb,var(--surface) 85%,transparent);backdrop-filter:blur(36px) saturate(1.5);-webkit-backdrop-filter:blur(36px) saturate(1.5);font-family:-apple-system,BlinkMacSystemFont,'PingFang SC',sans-serif}
+.app.mac-workspace .reader-library-rail>.home-sidebar{position:relative;flex:1;min-height:0;min-width:0;display:flex;flex-direction:column;margin:0}
+.app.mac-workspace .home-sidebar::before{display:none}
+[data-theme=dark] .app.mac-workspace .home-sidebar{--home-rule:color-mix(in srgb,var(--text) 16%,transparent);--home-sidebar:color-mix(in srgb,var(--surface-3) 92%,transparent);background:var(--home-sidebar);border-color:var(--border);box-shadow:0 8px 24px #0003,inset 0 1px #ffffff0a}
+
+/* Matching headers and wrapping tools keep the two reading panes aligned. */
+.app.mac-workspace .pdf-document-picker,.app.mac-workspace .analysis-column>.panel-heading{height:44px;min-height:44px;flex-shrink:0;padding:0 12px}
+.app.mac-workspace .pdf-toolbar,.app.mac-workspace .reader-section-switcher{min-height:var(--reader-tools-height,48px);flex-shrink:0;align-content:center}
+/* The composer lives under the PDF, with every action in normal document flow. */
+.app.mac-workspace .pdf-column>.chat-dock{flex:0 0 auto;min-width:0;padding:10px 12px 8px}
+.app.mac-workspace .question-box{position:relative;display:flex;align-items:center;gap:7px;height:42px;min-height:42px;padding:5px 7px 5px 12px;margin:0}
+.app.mac-workspace .question-box>input{flex:1;min-width:0}
+.app.mac-workspace .question-box>button,.app.mac-workspace .question-box>.action-menu>button{position:static;inset:auto;flex:0 0 28px;width:28px;height:28px;min-height:28px;padding:0;border-radius:50%;display:inline-flex;align-items:center;justify-content:center}
+.app.mac-workspace .question-box>.action-menu{position:relative;flex:0 0 28px;width:28px}
+.app.mac-workspace .question-box>.action-menu>button{background:transparent;color:var(--subtle);border:0;box-shadow:none}
+.app.mac-workspace .question-box>.action-menu>button:hover{background:var(--surface-3)}
+.app.mac-workspace .question-box .action-menu-popover{right:0;max-width:calc(100vw - 32px)}
+.app.mac-workspace .question-box .action-menu-popover>button{width:100%;height:auto;display:flex;justify-content:flex-start;border-radius:7px;background:transparent;color:var(--text);padding:9px 10px;text-align:left}
+.app.mac-workspace .chat-foot{font-size:10px;min-height:18px;margin-top:5px}
+.app.mac-workspace .chat-foot>button{font-size:10px}
+.app.mac-workspace .chat-history{max-height:min(260px,30vh);overscroll-behavior:contain}
+.app.mac-workspace .chat-history .prose{overflow-wrap:anywhere}
+/* Shared footer baseline across the sidebar and management list. */
+.app.mac-workspace .home-sidebar-bottom{display:flex;align-items:center;height:64px;min-height:64px;flex:0 0 64px;margin:0 -10px -10px;padding:10px 10px 11px;border-top:0}
+.app.mac-workspace .home-sidebar-actions{width:100%;height:42px;padding:0 6px;justify-content:flex-start}
+.app.mac-workspace .home-list-footer{height:64px;min-height:64px;flex:0 0 64px;padding:0 18px}
+
+.app.mac-workspace .analysis-column>.panel-heading .heading-actions{display:flex;align-items:center;gap:4px;flex-shrink:0}
+.app.mac-workspace .reader-section-switcher{padding-top:6px;padding-bottom:6px;align-items:center;margin:0}
+.reader-menu-controls{display:flex;flex-direction:column;gap:12px;padding:6px 4px 12px;border-bottom:1px solid var(--border);margin-bottom:5px}
+.reader-menu-controls .reader-mode-control{display:flex;width:100%;background:var(--surface-2);padding:3px;border-radius:9px}
+.reader-menu-controls .reader-mode-control>button{display:flex;align-items:center;justify-content:center;gap:5px;flex:1;padding:6px;border-radius:7px;font-size:11px}
+.reader-menu-controls .reader-mode-control>button[aria-pressed=true]{background:var(--surface);box-shadow:0 1px 3px #0002}
+.reader-menu-controls .reader-zoom{display:flex;justify-content:center;align-self:center;margin:0}
+.app.mac-workspace .navigation .nav-tabs{display:flex;align-self:center;width:auto;gap:3px}
+.app.mac-workspace .navigation .nav-tabs>button{width:40px;min-width:40px;height:32px;padding:0}
+
+.app.mac-workspace .navigation .nav-controls{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:44px;padding:5px 12px;border-bottom:1px solid var(--border);flex-shrink:0}
+.app.mac-workspace .navigation .nav-controls .nav-tabs{margin:0}
+.app.mac-workspace .pdf-secondary-tools{min-width:0;max-width:100%;flex-wrap:wrap;row-gap:4px}
+
+.app.mac-workspace .reader-section .section-number{display:inline-grid;place-items:center;width:28px;height:28px;min-width:28px;flex:0 0 28px;padding:0;margin:0;border:0;border-radius:8px;background:color-mix(in srgb,var(--text) 8%,transparent);color:var(--text);font-size:12px;line-height:1;font-variant-numeric:tabular-nums}
+
+.app.mac-workspace .heading-actions .action-menu-popover>.sync-badge{display:flex;align-items:center;gap:7px;margin:6px 9px;padding-top:8px;border-top:1px solid var(--border);font-size:10px;color:var(--subtle)}
+
+/* Keep both PDF tool groups centered as the pane resizes or wraps. */
+.app.mac-workspace .pdf-toolbar{justify-content:center;column-gap:10px;row-gap:6px}
+.app.mac-workspace .pdf-primary-tools{flex:0 1 auto;min-width:0;max-width:100%;justify-content:center;flex-wrap:wrap;row-gap:4px}
+.app.mac-workspace .pdf-secondary-tools{margin-inline:0;justify-content:center;flex:0 1 auto}
+.app.mac-workspace .reader-comfort .figure-badge{font-size:14px;line-height:1.7;margin-top:0;flex-shrink:0}
+
+.app.mac-workspace .reader-comfort .reader-figure h3{font-size:14px;line-height:1.7}
+
+/* A single compact composer shares the sidebar footer baseline. */
+.app.mac-workspace .pdf-column>.chat-dock{padding:10px 12px 11px;min-height:64px}
+.app.mac-workspace .reader-library-rail .home-sidebar-bottom{height:64px;min-height:64px;flex-basis:64px;padding:10px 10px 11px;align-items:center}
+.app.mac-workspace .reader-library-rail .home-sidebar-actions{height:42px}
+.app.mac-workspace .reader-overview-body{padding:4px 0 12px}
+.app.mac-workspace .reader-overview-body .analysis-intro{margin:0;padding:0}
+.app.mac-workspace .reader-overview>summary>button{margin-left:auto}
+.app.mac-workspace .reader-overview>summary>svg:last-child{margin-left:0}
+.app.mac-workspace .question-box>.chat-model-picker{flex:0 0 28px}
+.app.mac-workspace .question-box .chat-model-menu{width:260px;left:0;right:auto;max-width:min(260px,calc(100vw - 32px));padding:12px}
+.chat-model-menu label{display:flex;flex-direction:column;gap:5px;font-size:11px;color:var(--subtle);margin-bottom:10px}
+.chat-model-menu select{width:100%;padding:7px;border:1px solid var(--border);border-radius:7px;background:var(--surface);color:var(--text);font-size:12px}
+.chat-model-menu .chat-quick-button{display:flex;width:100%;align-items:center;gap:7px;padding:8px;border-radius:7px;background:var(--surface-2);font-size:12px}
+.chat-model-menu .chat-quick-button[aria-pressed=true]{color:var(--accent);background:var(--accent-soft)}
+.chat-model-menu small{display:block;color:var(--muted);font-size:10px;line-height:1.5;margin:6px 0 10px}
+
+.app.mac-workspace .reader-section-switcher select:focus{outline:none!important;box-shadow:none!important;border-color:transparent!important}
+.app.mac-workspace .reader-section-switcher select:focus-visible{border-bottom:1px solid var(--accent)!important}
+
+/* Toolbar groups follow the reading-column boundary, including after dragging. */
+.app.mac-workspace .titlebar{padding-right:8px}
+.app.mac-workspace .reader-toolbar-actions{gap:8px}
+.app.mac-workspace .reader-toolbar-actions .title-actions{width:var(--reader-nav-width,auto);flex-shrink:0;padding:0 10px;justify-content:space-between;align-items:center;height:36px}
+
+@media(max-width:1000px){.app.mac-workspace .has-reader-navigation .reader-toolbar-actions .title-actions{width:190px}}
+
+.app.mac-workspace .pdf-secondary-tools{column-gap:2px}
+.app.mac-workspace .pdf-secondary-tools .pdf-icon-button{width:26px;flex:0 0 26px}
+
+/* Keep a single settings button in the same place on both screens. */
+.app.mac-workspace .home-sidebar-actions>button{width:36px;height:36px;min-height:36px;padding:0;margin-left:0}
+.app.mac-workspace .home-sidebar-actions>button:last-child{margin-left:0}
+.settings-version{margin-right:auto;align-self:center;font-size:11px;color:var(--muted)}
+/* Conversation floats above the composer and never changes the PDF viewport. */
+.app.mac-workspace .pdf-column>.chat-dock{position:relative;background:transparent;border:0;box-shadow:none;backdrop-filter:none;-webkit-backdrop-filter:none;min-height:64px;padding-top:11px}
+.app.mac-workspace .chat-history{position:absolute;z-index:25;left:12px;right:12px;bottom:calc(100% + 4px);max-height:min(380px,55vh);margin:0;padding:14px;border:0;border-radius:18px;background:color-mix(in srgb,var(--surface) 90%,transparent);backdrop-filter:blur(28px) saturate(1.2);-webkit-backdrop-filter:blur(28px) saturate(1.2);box-shadow:0 10px 36px color-mix(in srgb,var(--text) 18%,transparent);overflow:auto;overscroll-behavior:contain}
+.app.mac-workspace .chat-history-header{gap:8px}
+.app.mac-workspace .chat-history-empty{font-size:12px;color:var(--subtle);line-height:1.7;padding:6px 0}
+.app.mac-workspace .question-box>.chat-history-toggle{background:transparent;color:var(--subtle);border:0;box-shadow:none}
+.app.mac-workspace .question-box>.chat-history-toggle:hover,.app.mac-workspace .question-box>.chat-history-toggle.is-active{color:var(--accent);background:var(--accent-soft)}
+
+.app.mac-workspace .chat-history{display:flex;flex-direction:column;overflow:hidden}
+.app.mac-workspace .chat-history-header{flex:0 0 auto;margin-bottom:8px}
+.app.mac-workspace .chat-history-messages{min-height:0;overflow:auto;overscroll-behavior:contain}
+.app.mac-workspace .chat-history-header>button{flex:0 0 24px}
+
+/* Compact macOS-style settings: categories stay fixed, only one panel scrolls. */
+.app .app-settings{width:min(900px,94vw)!important;height:min(660px,88vh);max-height:88vh;padding:0!important;display:grid;grid-template-columns:172px minmax(0,1fr);grid-template-rows:minmax(0,1fr) auto;overflow:hidden;border-radius:18px;background:var(--surface);isolation:isolate}
+.settings-navigation{grid-column:1;grid-row:1/-1;display:flex;flex-direction:column;min-height:0;padding:24px 12px 12px;background:color-mix(in srgb,var(--surface-3) 70%,transparent)}
+.settings-brand{display:flex;align-items:center;gap:8px;padding:0 8px 25px;color:#8066cb;font-size:16px;letter-spacing:-.4px}
+.settings-navigation nav{display:flex;flex-direction:column;gap:5px;flex:1;min-height:0}
+.settings-tab{display:flex;align-items:center;gap:10px;min-height:40px;padding:9px 12px;text-align:left;border-radius:9px;font-size:13px;color:var(--text)}
+.settings-tab>svg{color:var(--accent)}
+.settings-tab:hover{background:color-mix(in srgb,var(--text) 5%,transparent)}
+.settings-tab.active{background:color-mix(in srgb,var(--text) 10%,transparent);font-weight:600}
+.settings-about-tab{margin-top:auto}
+.settings-content{grid-column:2;min-width:0;min-height:0;display:flex;flex-direction:column}
+.settings-content-heading{display:flex;align-items:center;justify-content:space-between;padding:22px 24px 16px;flex:0 0 auto}
+.app-settings .settings-content-heading h2{font-size:21px;line-height:1.3}
+.settings-pane{min-height:0;overflow:auto;padding:0 24px 20px;overscroll-behavior:contain}
+.app-settings .settings-pane .setting-group{margin:0;padding:4px 16px;border:0;border-radius:12px;background:var(--surface-2)}
+.app-settings .settings-pane label{display:flex;justify-content:space-between;align-items:center;gap:18px;margin:0;padding:12px 0;font-size:13px}
+.app-settings .settings-pane label>select,.app-settings .settings-pane label>input:not([type=checkbox]){display:block;width:min(260px,60%);margin:0;padding:8px 10px;background:var(--surface);min-width:0;font-size:12px}
+.app-settings .settings-pane .toggle-row{gap:12px}
+.app-settings .settings-pane .toggle-row>div{min-width:0;flex:1}
+.app-settings .settings-pane .form-hint{line-height:1.7;margin:10px 0}
+.app-settings .settings-pane .settings-info{padding:12px;margin:10px 0;font-size:11px;line-height:1.7}
+.app-settings .settings-pane .palette-swatches{margin:0 0 12px;justify-content:flex-end}
+.app .app-settings>.modal-actions{grid-column:2;margin:0;padding:12px 24px;display:flex;align-items:center;justify-content:flex-end;background:var(--surface)}
+.app .app-settings>.modal-actions>button{display:inline-flex;align-items:center;gap:6px}
+.settings-about{text-align:center;padding:60px 20px;color:var(--text)}
+.settings-about>svg{color:#8066cb}
+.app-settings .settings-about h3{font-size:24px;margin:12px 0 8px}
+.settings-about p{font-size:13px;color:var(--subtle);line-height:1.8}
+.app-settings .settings-pane .settings-shortcuts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+.app-settings .settings-shortcuts>button{justify-content:flex-start;display:flex;align-items:center;gap:8px;min-height:42px;padding:10px;background:var(--surface);border-radius:8px;font-size:12px;text-align:left}
+@media(max-width:650px){.app .app-settings{grid-template-columns:132px minmax(0,1fr)}.settings-navigation{padding-left:8px;padding-right:8px}.settings-brand{font-size:13px;gap:5px}.settings-tab{font-size:12px;padding:9px;gap:7px}.settings-pane{padding:0 12px 16px}.settings-content-heading{padding:18px 14px}.app-settings .settings-pane label{align-items:flex-start;flex-direction:column;gap:8px}.app-settings .settings-pane label>select,.app-settings .settings-pane label>input:not([type=checkbox]){width:100%}.app-settings .settings-pane .toggle-row{flex-direction:row;align-items:center}}
+/* Compact cache controls use the same grouped settings rows. */
+.cache-settings h3{font-size:13px;margin:0 0 12px;color:var(--text-secondary)}
+.cache-size-row,.cache-size-row>div{display:flex;align-items:center;gap:8px}
+.cache-size-row{justify-content:space-between;min-height:42px}
+.cache-size-row strong{margin-left:8px;font-variant-numeric:tabular-nums}
+.cache-settings .form-hint{line-height:1.65}
+.settings-pane>.setting-group+.setting-group{margin-top:14px}

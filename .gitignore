@@ -23,3 +23,9 @@ artifacts/
 !.env.example
 public/pdfjs/
 *.log
+
+# User-provided journal catalog and generated native/Python runtimes.
+server/data/journals.json
+server/runtime/
+server/native/
+.paperread-documents/

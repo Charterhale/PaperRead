@@ -2,6 +2,7 @@ import { aiRequest, supportsVision } from '../lib/aiSettings';
 import { useEffect, useRef, useState } from 'react';
 import type { BackgroundJob, Paper, Settings } from '../types';
 import { inspectPdfVisualPages, renderPdfImageBatches } from '../lib/pdf';
+import {syncDocument} from '../lib/documentFiles';
 import { getPdf } from '../lib/storage';
 
 async function post(path: string, body: unknown, signal?: AbortSignal): Promise<BackgroundJob> {
@@ -36,6 +37,8 @@ export function useAnalysisPreparation(serverJobs: BackgroundJob[], refresh: () 
       try {
         check(); const bytes=await getPdf(paper.id);check();
         if(!bytes) throw new Error('无法读取此文献的 PDF，请重新导入后继续');
+        progress('正在保存原文 Markdown，识别扫描页');
+        const source=await syncDocument(paper,bytes,true);check();
         if(!existing) {
           progress('正在检查含图、矢量绘图和扫描页面');
           const pages=await inspectPdfVisualPages(bytes,(done,total)=>{check();progress(`检查页面 ${done} / ${total}`,Math.round(done/total*4));});
@@ -43,7 +46,7 @@ export function useAnalysisPreparation(serverJobs: BackgroundJob[], refresh: () 
           const expectedVisualPages=pages.filter(p=>p.kind!=='text').map(p=>p.page);
           if(expectedVisualPages.length&&(!settings.vision||!supportsVision(settings))) throw new Error(`检测到 ${expectedVisualPages.length} 页图片、扫描内容或待确认页面。请在设置中选择支持原图的模型并开启“结合原图解析”，再继续任务。`);
           // Do not abort staging: retain its returned ID even if cancellation races the response.
-          job=await post('stage',{paperId:paper.id,title:paper.title,pages:paper.pages,category:paper.category,...aiRequest(settings),pipelineVersion:2,images:[],expectedVisualPages,visualPlan:{version:1,pages}});
+          job=await post('stage',{paperId:paper.id,title:paper.title,pages:source.pages,sourceFormat:'markdown',category:paper.category,...aiRequest(settings),pipelineVersion:2,images:[],expectedVisualPages,visualPlan:{version:1,pages}});
           update(paper.id,job);
           if(controller.signal.aborted) {await post(job.id+'/cancel',{});check();}
           if(job.status!=='preparing') {await callbacks.current.refresh();forget(paper.id);return;}

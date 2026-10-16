@@ -1,3 +1,5 @@
+import {paperFolders,withFolders} from './libraryHome';
+const organizationHelpers={paperFolders,withFolders};
 import type { Paper, Folder } from '../types';
 
 const DB = 'paperlens-library';
@@ -19,7 +21,7 @@ export async function getAllRecords(): Promise<PaperRecord[]> {
     r.onsuccess = () => resolve(r.result); r.onerror = () => reject(r.error);
   });
 }
-export async function listPapers(includeDeleted = false): Promise<Paper[]> { return (await getAllRecords()).filter(p => includeDeleted || !p.deletedAt).map(({ pdf: _pdf, supplementPdfs: _supplements, ...paper }) => paper).sort((a, b) => b.addedAt - a.addedAt); }
+export async function listPapers(includeDeleted = false): Promise<Paper[]> { return (await getAllRecords()).filter(p => includeDeleted || !p.deletedAt&&!p.mergedInto).map(({ pdf: _pdf, supplementPdfs: _supplements, ...paper }) => paper).sort((a, b) => b.addedAt - a.addedAt); }
 export async function savePaper(paper: Paper, pdf?: Uint8Array) {
   const database = await db();
   return new Promise<void>((resolve, reject) => {
@@ -34,14 +36,7 @@ export async function getPdf(id: string): Promise<Uint8Array | null> {
 }
 export async function saveSupplement(paper:Paper,id:string,bytes:Uint8Array){const database=await db();return new Promise<void>((resolve,reject)=>{const tx=database.transaction('papers','readwrite'),store=tx.objectStore('papers'),r=store.get(paper.id);r.onsuccess=()=>{if(!r.result){tx.abort();return;}store.put({...paper,...(r.result.deletedAt?{deletedAt:r.result.deletedAt}:{}),pdf:r.result.pdf,supplementPdfs:{...r.result.supplementPdfs,[id]:bytes}});};tx.oncomplete=()=>resolve();tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error||new Error('附件保存中止'));});}
 export async function getSupplementPdf(paperId:string,id:string):Promise<Uint8Array|null>{const database=await db();return new Promise((resolve,reject)=>{const r=database.transaction('papers').objectStore('papers').get(paperId);r.onsuccess=()=>resolve(r.result?.supplementPdfs?.[id]||null);r.onerror=()=>reject(r.error);});}
-export async function setPaperTrashed(id:string, trashed:boolean) {
-  const database=await db();
-  return new Promise<void>((resolve,reject)=>{
-    const tx=database.transaction('papers','readwrite'),store=tx.objectStore('papers'),r=store.get(id);
-    r.onsuccess=()=>{if(!r.result)return;const p={...r.result};if(trashed)p.deletedAt=Date.now();else delete p.deletedAt;store.put(p);};
-    tx.oncomplete=()=>resolve();tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error||new Error('回收站操作失败'));
-  });
-}
+export async function setPaperTrashed(id:string,trashed:boolean){const database=await db();return new Promise<void>((resolve,reject)=>{const tx=database.transaction('papers','readwrite'),store=tx.objectStore('papers'),r=store.getAll();r.onsuccess=()=>{const all=r.result as PaperRecord[],target=all.find(p=>p.id===id);if(!target)return;const group=all.filter(p=>p.id===id||p.mergedInto===id);for(const p of group){const next={...p};if(trashed)next.deletedAt=Date.now();else{delete next.deletedAt;if(next.id===id&&next.mergedInto){const parent=all.find(p=>p.id===next.mergedInto);if(parent)store.put({...parent,mergedPaperIds:parent.mergedPaperIds?.filter(source=>source!==id)});delete next.mergedInto;}}store.put(next);}};tx.oncomplete=()=>resolve();tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error||Error('回收站操作失败'));});}
 export async function deletePaper(id: string) {
   const database = await db();
   return new Promise<void>((resolve, reject) => { const tx = database.transaction('papers', 'readwrite'); tx.objectStore('papers').delete(id); tx.oncomplete = () => resolve(); tx.onerror = () => reject(tx.error); tx.onabort = () => reject(tx.error || new Error('删除被中止')); });
@@ -111,7 +106,7 @@ export async function exportBackup(): Promise<{ blob: Blob; fileName: string; pa
   const records = await getAllRecords(), papers: BackupArchive['papers'] = [];
   for (const { pdf, supplementPdfs, ...paper } of records) {
     const bytes = pdf ? new Uint8Array(pdf) : null;
-    const supplements=[];for(const item of paper.supplements||[]){const data=supplementPdfs?.[item.id];if(!data)throw new Error('补充材料缺少原始 PDF：'+item.title);const bytes=new Uint8Array(data);supplements.push({id:item.id,pdf:toBase64(bytes),pdfSha256:await sha256(bytes)});}
+    const supplements=[];for(const item of paper.supplements||[]){const data=supplementPdfs?.[item.id];if(!data){if(paper.pdfRemoved)continue;throw new Error('补充材料缺少原始 PDF：'+item.title);}const bytes=new Uint8Array(data);supplements.push({id:item.id,pdf:toBase64(bytes),pdfSha256:await sha256(bytes)});}
     papers.push({ supplements, paper: cleanValue(paper) as Paper, pdf: bytes ? toBase64(bytes) : null, ...(bytes ? { pdfSha256: await sha256(bytes) } : {}) });
   }
   let jobs: BackupArchive['jobs'];
@@ -147,7 +142,14 @@ function assertAnalysis(value: unknown): void {
 }
 function assertPaper(paper: unknown): asserts paper is Paper {
   if (!object(paper) || typeof paper.id !== 'string' || !paper.id || paper.id.length > 200 || typeof paper.title !== 'string' || typeof paper.fileName !== 'string' || typeof paper.folderId !== 'string' || typeof paper.notes !== 'string' || typeof paper.starred !== 'boolean' || typeof paper.addedAt !== 'number' || !Number.isFinite(paper.addedAt) || !Number.isInteger(paper.pageCount) || (paper.pageCount as number) < 1 || (paper.pageCount as number) > 10000 || !Array.isArray(paper.pages) || paper.pages.some(page => typeof page !== 'string') || !Array.isArray(paper.outline) || paper.outline.some(item => !object(item) || typeof item.title !== 'string' || !Number.isInteger(item.page)) || !CATEGORIES.includes(paper.category as string)) throw new Error('备份中的文献资料格式不完整，未写入任何内容。');
+  for(const key of ['folderIds','relatedPaperIds','mergedPaperIds'])if(paper[key]!==undefined&&(!Array.isArray(paper[key])||(paper[key] as unknown[]).some(x=>typeof x!=='string')))throw new Error('备份中的文献分组格式错误。');
+  if(paper.mergedInto!==undefined&&typeof paper.mergedInto!=='string')throw new Error('备份中的合并标识格式错误。');
   if (paper.analysis !== undefined) assertAnalysis(paper.analysis);
+  if(paper.authorProfile!==undefined&&(!object(paper.authorProfile)||['paperTitle','name','firstInstitution','country','direction','status'].some(k=>typeof (paper.authorProfile as Record<string,unknown>)[k]!=='string')||!Number.isFinite(paper.authorProfile.checkedAt)||!Array.isArray(paper.authorProfile.honors)||paper.authorProfile.honors.some(x=>typeof x!=='string')||!Array.isArray(paper.authorProfile.sources)||paper.authorProfile.sources.some(x=>!object(x)||typeof x.title!=='string'||typeof x.url!=='string'||!x.url.startsWith('https://'))))throw new Error('备份中的作者资料格式错误。');
+  if(paper.integrity!==undefined&&(!object(paper.integrity)||!Number.isFinite(paper.integrity.checkedAt)||typeof paper.integrity.identifier!=='string'||!['notice','no-notice','unavailable'].includes(paper.integrity.status as string)||!Array.isArray(paper.integrity.notices)||paper.integrity.notices.some(n=>!object(n)||['type','title','url','source'].some(k=>typeof n[k]!=='string')||!(n.url as string).startsWith('https://'))))throw new Error('备份中的撤稿记录格式错误。');
+  if(paper.titleTranslation!==undefined&&(!object(paper.titleTranslation)||typeof paper.titleTranslation.original!=='string'||typeof paper.titleTranslation.text!=='string'||!['codex','deepseek'].includes(paper.titleTranslation.provider as string)||!Number.isFinite(paper.titleTranslation.createdAt)))throw new Error('备份中的标题翻译格式错误。');
+  for(const key of ['citationCount','citationUpdatedAt'])if(paper[key]!==undefined&&(!Number.isSafeInteger(paper[key])||(paper[key] as number)<0))throw new Error('备份中的引用数据格式错误。');
+  if (paper.issns !== undefined && (!Array.isArray(paper.issns) || paper.issns.some(x=>typeof x!=='string'||!/^\d{4}-\d{3}[\dX]$/i.test(x)))) throw new Error('备份中的 ISSN 格式错误。');
   if (paper.tags !== undefined && (!Array.isArray(paper.tags) || paper.tags.some(tag => typeof tag !== 'string'))) throw new Error('备份中的标签格式错误。');
   if (paper.readingStatus !== undefined && !['unread', 'reading', 'done'].includes(paper.readingStatus as string)) throw new Error('备份中的阅读状态格式错误。');
   for (const key of ['doi', 'pmid', 'authors', 'journal', 'year', 'fileHash', 'officialUrl']) if (paper[key] !== undefined && typeof paper[key] !== 'string') throw new Error('备份中的文献资料格式错误。');
@@ -177,7 +179,7 @@ function validateArchive(value: unknown): BackupArchive {
     if (!object(entry)) throw new Error('文献记录格式错误。'); assertPaper(entry.paper);
     if (ids.has(entry.paper.id)) throw new Error('备份中存在重复的文献编号。'); ids.add(entry.paper.id);
     const attachments=entry.supplements;if(attachments!==undefined&&(!Array.isArray(attachments)||attachments.some(s=>!object(s)||typeof s.id!=='string'||typeof s.pdf!=='string'||!s.pdf.startsWith('JVBERi0')||typeof s.pdfSha256!=='string'||!/^[a-f0-9]{64}$/.test(s.pdfSha256))||new Set(attachments.map(s=>(s as Record<string,unknown>).id)).size!==attachments.length))throw new Error('补充 PDF 备份格式错误。');
-    if((entry.paper.supplements||[]).some(s=>!(attachments as {id:string}[]|undefined)?.some(x=>x.id===s.id))||(attachments as {id:string}[]|undefined)?.some(x=>!(entry.paper as Paper).supplements?.some(s=>s.id===x.id)))throw new Error('补充材料清单与 PDF 不一致。');
+    if(!entry.paper.pdfRemoved&&(entry.paper.supplements||[]).some(s=>!(attachments as {id:string}[]|undefined)?.some(x=>x.id===s.id))||(attachments as {id:string}[]|undefined)?.some(x=>!(entry.paper as Paper).supplements?.some(s=>s.id===x.id)))throw new Error('补充材料清单与 PDF 不一致。');
     if (entry.pdf !== null && typeof entry.pdf !== 'string') throw new Error('备份中 PDF 数据格式错误。');
     if (typeof entry.pdf === 'string' && !entry.pdf.startsWith('JVBERi0')) throw new Error('备份中的 PDF 文件头无效。');
     if (entry.pdfSha256 !== undefined && (typeof entry.pdfSha256 !== 'string' || !/^[a-f0-9]{64}$/.test(entry.pdfSha256))) throw new Error('PDF 完整性校验格式错误。');
@@ -268,3 +270,23 @@ export async function restoreBackup(input: BackupArchive, options: { conflicts: 
   return result;
 }
 export function downloadBackup(blob: Blob, fileName: string) { const url = URL.createObjectURL(blob), link = document.createElement('a'); link.href = url; link.download = fileName; link.click(); setTimeout(() => URL.revokeObjectURL(url), 60_000); }
+
+/** All records are read and changed in one transaction; payloads and annotations stay untouched. */
+export async function organizeLibrary(operation:{kind:'merge';primary:string;ids:string[]}|{kind:'split';id:string}|{kind:'related';id:string;ids:string[]}|{kind:'trash';ids:string[];removePdf:boolean}|{kind:'remove-folder';folderId:string}){
+ const database=await db();return new Promise<void>((resolve,reject)=>{const tx=database.transaction('papers','readwrite'),store=tx.objectStore('papers'),r=store.getAll();let failure:unknown;
+ r.onsuccess=()=>{try{const all=r.result as PaperRecord[],byId=new Map(all.map(p=>[p.id,p]));
+  if(operation.kind==='merge'){
+   const primary=byId.get(operation.primary),sources=operation.ids.filter(id=>id!==operation.primary).map(id=>byId.get(id));if(!primary||primary.deletedAt||primary.mergedInto||sources.length<1||sources.some(p=>!p||p.deletedAt||p.mergedInto||p.mergedPaperIds?.length))throw Error('这些记录暂时无法合并，请刷新后重试');
+   const values=sources as PaperRecord[];const {paperFolders,withFolders}=organizationHelpers;
+   const normalize=(doi:string|undefined)=>(doi||'').trim().toLowerCase().replace(/^https?:\/\/(?:dx\.)?doi\.org\//,'').replace(/^doi:\s*/,'');
+   const connected=new Set([primary.id]);let changed=true;while(changed){changed=false;for(const p of values)if(!connected.has(p.id)&&[primary,...values].some(q=>connected.has(q.id)&&(p.fileHash&&p.fileHash===q.fileHash||normalize(p.doi)&&normalize(p.doi)===normalize(q.doi)))){connected.add(p.id);changed=true;}}
+   if(values.some(p=>!connected.has(p.id)))throw Error('只允许合并 DOI 或 PDF 指纹相同的文献');
+   const updated={...primary,...withFolders([primary,...values].flatMap(paperFolders)),tags:[...new Set([primary,...values].flatMap(p=>p.tags||[]))],mergedPaperIds:[...new Set([...(primary.mergedPaperIds||[]),...values.map(p=>p.id)])]};
+   for(const field of ['authors','journal','year','doi','pmid','officialUrl'] as const)if(!updated[field])updated[field]=values.find(p=>p[field])?.[field];
+   store.put(updated);for(const source of values)store.put({...source,mergedInto:primary.id});
+  }else if(operation.kind==='split'){const p=byId.get(operation.id);if(!p)throw Error('文献已移除');store.put({...p,mergedPaperIds:[]});for(const id of p.mergedPaperIds||[]){const source=byId.get(id);if(source?.mergedInto===p.id){delete source.mergedInto;store.put(source);}}}
+  else if(operation.kind==='related'){const p=byId.get(operation.id);if(!p||p.deletedAt)throw Error('文献已移除');const ids=[...new Set(operation.ids.filter(id=>id!==p.id&&byId.has(id)&&!byId.get(id)!.deletedAt&&!byId.get(id)!.mergedInto))];store.put({...p,relatedPaperIds:ids});for(const other of all.filter(q=>q.id!==p.id)){const previous=other.relatedPaperIds||[],next=ids.includes(other.id)?[...new Set([...previous,p.id])]:previous.filter(id=>id!==p.id);if(JSON.stringify(previous)!==JSON.stringify(next))store.put({...other,relatedPaperIds:next});}}
+  else if(operation.kind==='remove-folder'){for(const p of all)if(organizationHelpers.paperFolders(p).includes(operation.folderId))store.put({...p,...organizationHelpers.withFolders(organizationHelpers.paperFolders(p).filter(id=>id!==operation.folderId))});}
+  else{const ids=new Set(operation.ids);for(const p of all)if(ids.has(p.id)||p.mergedInto&&ids.has(p.mergedInto)){const updated={...p,deletedAt:Date.now(),...(operation.removePdf?{pdf:undefined,supplementPdfs:undefined,pdfRemoved:true}:{} )};store.put(updated);}}
+ }catch(e){failure=e;tx.abort();}};tx.oncomplete=()=>resolve();tx.onerror=()=>reject(failure||tx.error);tx.onabort=()=>reject(failure||tx.error||Error('文献整理未完成'));});
+}

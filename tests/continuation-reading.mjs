@@ -8,7 +8,7 @@ const browser=await chromium.launch({executablePath:'/Applications/Microsoft Edg
 const page=await browser.newPage({viewport:{width:1680,height:1080}}),errors=[],passed=[];page.on('pageerror',e=>errors.push(e.message));
 await page.route('**/api/**',r=>r.fulfill({json:{jobs:[],records:[],items:[],models:[],available:true,authenticated:true}}));
 try{
- await page.goto(origin);await page.waitForSelector('.reader-section');
+ await page.goto(origin);await page.waitForSelector('.library-home');await page.getByRole('button',{name:'正在阅读',exact:true}).first().click();await page.getByRole('button',{name:'示例文献',exact:true}).click();await page.waitForSelector('.reader-section:not([hidden])');
  const original=await page.evaluate(async()=>{
   const {demoPaper}=await import('/src/lib/demo.ts');const p=structuredClone(demoPaper);p.analysisEdited=true;p.notes='保留的笔记\n\n## 证据性质\n\n我自己的笔记照常显示。';
   const base=p.analysis.sections.at(-1);base.title='讨论';base.shortTitle='讨论';base.markdown='讨论的第一段。\n\n### 证据性质\n\n元信息提示哨兵。\n\n### 结果解读\n\n实际结果保留。';
@@ -21,7 +21,7 @@ try{
   p.outline=[{title:'Introduction',page:1},{title:'Discussion',page:2},...continuations.map(s=>({title:s.title,page:s.page})),{title:'Acknowledgements',page:6},{title:'Author contributions',page:6},{title:'References',page:6},{title:'Methods',page:6}];
   localStorage.setItem('pl-demo-paper',JSON.stringify(p));localStorage.setItem('pl-reading-section-'+p.id,JSON.stringify({id:'continuation-6',page:4}));localStorage.setItem('pl-page-'+p.id,'4');return p;
  });
- await page.reload();await page.waitForSelector('.reader-section');await page.getByRole('button',{name:'全文浏览',exact:true}).click();
+ await page.reload();await page.waitForSelector('.library-home');await page.getByRole('button',{name:'正在阅读',exact:true}).first().click();await page.getByRole('button',{name:'示例文献',exact:true}).click();await page.waitForSelector('.reader-section:not([hidden])');await page.getByRole('button',{name:'全文浏览',exact:true}).click();
  assert.equal(await page.locator('.reader-section').count(),7);assert.equal(await page.locator('.nav-entry').count(),7);assert.equal(await page.getByLabel('选择阅读小节').inputValue(),'boundaries');
  assert.doesNotMatch(await page.locator('.reader-section-list').innerText(),/行政信息哨兵|致谢|作者贡献|参考文献/);
  const discussion=page.locator('#section-boundaries');await expect(discussion.locator(':scope>summary h2')).toHaveText('讨论');assert.equal(await discussion.locator('.section-detail').count(),1);
@@ -37,7 +37,7 @@ try{
  await page.getByRole('button',{name:'原文大纲',exact:true}).click();assert.equal(await page.locator('.navigation .nav-section').count(),3);assert.doesNotMatch(await page.locator('.nav-scroll').innerText(),/致谢|作者贡献|参考文献|Acknowledgements|References|continued/);
  passed.push('简洁与完整逻辑图、原文大纲均使用同一合并和排除规则');
  await page.getByRole('button',{name:'解析目录',exact:true}).click();await page.getByLabel('选择阅读小节').selectOption('boundaries');await page.getByRole('button',{name:'逐节阅读',exact:true}).click();
- await page.screenshot({path:'artifacts/v0.7.4-continuation-reading.png'});
+ await page.screenshot({path:'artifacts/v0.8.0-continuation-reading.png'});
  const after=await page.evaluate(()=>JSON.parse(localStorage.getItem('pl-demo-paper')));assert.deepEqual(after.analysis,original.analysis);assert.equal(after.notes,original.notes);assert.deepEqual(errors,[]);
- await page.getByRole('button',{name:'我的笔记',exact:true}).click();if(await page.getByRole('button',{name:'预览 Markdown',exact:true}).isVisible())await page.getByRole('button',{name:'预览 Markdown',exact:true}).click();await expect(page.locator('.note-preview')).toContainText('证据性质');await expect(page.locator('.note-preview')).toContainText('我自己的笔记照常显示');passed.push('新排版未改写任何原始章节、逻辑图或笔记，用户笔记不受解析文字过滤影响');await writeFile('artifacts/v0.7.4-continuation-checks.json',JSON.stringify({passed,errors},null,2));console.log(JSON.stringify({passed,errors},null,2));
-}catch(error){await page.screenshot({path:'artifacts/v0.7.4-continuation-error.png'});console.error(errors,await page.locator('body').innerText());throw error;}finally{await browser.close();await server.close();}
+ await page.getByRole('button',{name:'我的笔记',exact:true}).click();if(await page.getByRole('button',{name:'预览 Markdown',exact:true}).isVisible())await page.getByRole('button',{name:'预览 Markdown',exact:true}).click();await expect(page.locator('.note-preview')).toContainText('证据性质');await expect(page.locator('.note-preview')).toContainText('我自己的笔记照常显示');passed.push('新排版未改写任何原始章节、逻辑图或笔记，用户笔记不受解析文字过滤影响');await writeFile('artifacts/v0.8.0-continuation-checks.json',JSON.stringify({passed,errors},null,2));console.log(JSON.stringify({passed,errors},null,2));
+}catch(error){await page.screenshot({path:'artifacts/v0.8.0-continuation-error.png'});console.error(errors,await page.locator('body').innerText());throw error;}finally{await browser.close();await server.close();}

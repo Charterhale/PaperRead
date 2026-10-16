@@ -167,6 +167,13 @@ test('long-paper questions use one bounded retrieval request and retain relevant
   });
 });
 
+test('quick questions use a shorter answer budget and remain grounded in retrieved source', async () => {
+ const calls=[];
+ await withServer(async (_,options)=>{calls.push(JSON.parse(options.body));return response({answer:'本文比较了两组供者。'});},async({post})=>{
+  const result=await post('ask',{...request,question:'本文做了什么？',quickReply:true});assert.equal(result.status,200);assert.equal(calls.length,1);assert.equal(calls[0].max_tokens,1800);assert.match(calls[0].messages[1].content,/极速回答/);assert.match(calls[0].messages[1].content,/原文事实准确性/);
+ });
+});
+
 test('validation rejects unsafe and oversize inputs without calling the provider', async () => {
   let calls = 0;
   await withServer(async () => { calls += 1; return response(analysis()); }, async ({ post }) => {

@@ -1,37 +1,38 @@
 # PaperRead
 
-医学文献深度阅读工作台 · **0.7.4** · macOS Apple Silicon
+医学文献深度阅读工作台 · **0.9.9** · macOS Apple Silicon
 
 左侧读 PDF，中间读解析和笔记，右侧目录联动定位。支持基础医学、生信分析、纳米材料、临床研究及综述 / Meta。
 
-[下载 Mac 版](https://github.com/Charterhale/PaperRead/releases/tag/v0.7.4) · [查看源码](https://github.com/Charterhale/PaperRead)
+[下载 Mac 版](https://github.com/Charterhale/PaperRead/releases/tag/v0.9.9) · [查看源码](https://github.com/Charterhale/PaperRead)
 
 ## 阅读界面
 
 以下截图使用内置虚构教学文献，不含个人文献、笔记、标注或密钥。
 
-![浅色阅读界面](docs/screenshots/reading-light.png)
+![浅色阅读界面](docs/reader-light.png)
 
-![深色读图界面](docs/screenshots/figure-dark.png)
+![深色阅读界面](docs/reader-dark.png)
 
-![专注阅读](docs/screenshots/reading-focus.png)
+![历史对话](docs/reader-chat-history.png)
 
 ## 主要功能
 
-- **三栏联动**：点击章节、逻辑节点或图表，同时定位解析和 PDF；各栏可拖动调整宽度、独立滚动。
-- **按原文结果逻辑阅读**：保留引言和 Results 各小节的顺序，使用中文编号。讨论、结论简要呈现，方法集中在最后并默认折叠；合并真实续段，隐藏致谢、作者贡献和参考文献。
-- **以图为中心**：子图展开后优先展示“怎么看”和“结果”；分组、颜色、坐标等读图细节保留。支持框选精读、固定对照、折叠、编辑及原文跳转。
+- **三栏联动**：点击章节或逻辑节点，同时定位解析和 PDF；各栏可拖动调整宽度、独立滚动。
+- **按原文结果逻辑阅读**：研究背景对应 Introduction，解析保留 Results 各小节的顺序与中文编号；研究主线只呈现结果，不加入背景、研究缺口、方法和补充章节。大纲去除延伸数据和补充图后缀。
+- **以图为中心**：子图展开后优先展示“怎么看”和“结果”；分组、颜色、坐标等读图细节保留。支持框选精读、固定对照、折叠和编辑。
 - **PDF 阅读**：缩放、手形平移、文字选择、划词翻译、自选颜色高亮、书签、搜索、旋转、下载和打印。图像先显示，文字层随后加载。
 - **本机 AI**：默认调用已登录的官方 Codex CLI，使用自己的 ChatGPT 订阅；也可手动切换 DeepSeek API。支持模型及低 / 中 / 高推理强度选择、文献问答、翻译和后台分批解析。
 - **文献整理**：文件夹、分区、排序、重命名、标签、收藏、阅读状态、期刊官网链接和统一搜索。
 - **资料保留**：Markdown 笔记、解析编辑历史、回收站、完整备份与恢复、每日自动备份。
+- **缓存与节能**：查看缓存大小、手动清理、每天 / 每周 / 每 30 天定时清理；空闲时降低检查频率，可选择更省电。
 - **明暗与专注模式**：浅色、深色主题；一键收起两侧栏，解析字号独立调整。
 
-![模型设置](docs/screenshots/codex-settings.png)
+![分区设置](docs/settings-light.png)
 
 ## 安装与开始
 
-1. 在 [Releases](https://github.com/Charterhale/PaperRead/releases/tag/v0.7.4) 下载 `PaperRead-0.7.4-macOS-arm64.zip`，解压并把 `PaperRead.app` 拖入“应用程序”。
+1. 在 [Releases](https://github.com/Charterhale/PaperRead/releases/tag/v0.9.9) 下载 `PaperRead-0.9.9-macOS-arm64.zip`，解压并把 `PaperRead.app` 拖入“应用程序”。
 2. 打开软件，先使用内置教学文献熟悉界面，再拖入自己的 PDF。
 3. 若使用 Codex，请先安装官方 Codex CLI，并使用自己的 ChatGPT 账号登录；在左下角“设置”检查连接、选择模型和推理强度。无需 OpenAI API Key，订阅用量与日常 Codex 共享，可用模型和额度以自己的账号实际权限为准。
 4. 使用 DeepSeek 时，在设置中手动切换服务并填写自己的 API Key。
@@ -39,6 +40,8 @@
 当前安装包面向 **Apple Silicon Mac**，没有 Apple 开发者公证。下载页提供 SHA-256 校验文件。更新前建议在软件内导出完整备份。
 
 ## 本地数据与 AI 请求
+
+导入时保存 PDF 与标题中文释义；仅按下解析后才用 Microsoft MarkItDown 提取原文 MD，并结合原图解析。PDF、原文 MD 和解析 MD 放在同一个“期刊-年份-标题”文件夹。可将两份 MD 投送到公众号写作器复用。
 
 文献、笔记和标注存储在本机。桌面版继续沿用 `~/Library/Application Support/PaperLens`，更名无需迁移原有文献。
 
@@ -50,7 +53,13 @@ PDF 高亮与书签保存在本机，不直接改写原 PDF。图表解释由模
 
 ## 从源码运行
 
-需要 Node.js 22.12 或更新的受支持版本及 npm。
+需要 Node.js 22.12 或更新的受支持版本及 npm。桌面打包还需要 macOS Swift 编译工具和 Python 3.12 的 macOS arm64 独立运行环境（例如 [python-build-standalone](https://github.com/astral-sh/python-build-standalone) 的 install_only 包）。运行环境不存入 Git；将其解压后准备依赖：
+
+```bash
+node scripts/setup-runtime.mjs /absolute/path/to/standalone-python
+```
+
+期刊分区表由使用者自行提供，公开包不包含个人表格。可用 `scripts/import-journal-table.py` 整理本地表；桌面版读取 `~/Library/Application Support/PaperLens/Journal Catalog/journals.json`。
 
 ```bash
 npm ci
@@ -79,9 +88,8 @@ tests/      接口、数据保留、PDF 与阅读交互检查
 docs/       演示截图
 ```
 
-## 0.7.4 更新
+## 0.9.9 最终版
 
-- 恢复按原文 Results 小节逻辑展示，不再按宽泛主题压缩结果小节。
-- 引言和结果为阅读主线，方法统一置于末尾；正文、目录和逻辑图使用一致的分节。
-- 保留中文编号、小字图号、子图细节、原文跳转、折叠和编辑。
-- 原始解析、笔记、高亮、PDF 和附件保留；发布包不含个人阅读数据。
+设置改为分类布局，缓存大小、定时清理和节能选项位于“文献与数据”。返回文献库和开关左侧栏分别使用独立按钮，切换侧栏保留 PDF 及解析阅读位置。历史对话可随时展开和固定收起。
+
+完整变化见 [版本说明](docs/release-0.9.9.md)。

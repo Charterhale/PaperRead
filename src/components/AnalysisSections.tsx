@@ -1,11 +1,10 @@
-import { ArrowUpRight, ChevronDown, Crop, Crosshair, LoaderCircle, PencilLine, Pin, Sparkles } from 'lucide-react';
+import { ArrowUpRight, ChevronDown, Crop, PencilLine, Pin } from 'lucide-react';
 import type { Figure, Panel, Paper, Section } from '../types';
 import { readingText } from '../lib/analysisEditing';
 import { readLocal } from '../lib/storage';
 import ReadingDisclosure from './ReadingDisclosure';
 import ReadingMarkdown from './ReadingMarkdown';
 import CompactMarkdown from './CompactMarkdown';
-import ActionMenu from './ActionMenu';
 import ReadingTitle from './ReadingTitle';
 import SectionDetails from './SectionDetails';
 import { readingGroups, methodBrief, sectionTitle, panelReading, chapterSummary } from '../lib/readingStructure';
@@ -30,7 +29,7 @@ export default function AnalysisSections({ paper, active, focus, figureBusy, onG
     if (group.methods) return <ReadingDisclosure key={paper.id + ':methods'} paperId={paper.id} foldId="methods-overview-v1" className={'reader-section reader-methods ' + (isActive(group.sections) ? 'is-active' : '')} hidden={focus && !isActive(group.sections)}>
       <summary><span className="section-number">{i + 1}</span><h2>研究方法</h2><ChevronDown size={15}/></summary>
       <div className="method-brief-list">{group.sections.map((s, index) => <div key={s.id} id={'section-' + s.id} className="method-brief">
-        <div className="method-brief-heading"><span>{index + 1}.</span><h3 title={s.title}>{sectionTitle(s).replace(/^方法[：: ]*/, '')}</h3><button className="icon-btn tiny" title="查看方法原文" onClick={() => onGo(s.id, s.page)}><ArrowUpRight size={14}/></button><button className="icon-btn tiny" title="查看或编辑完整方法解析" onClick={() => onSectionEdit(structuredClone(s))}><PencilLine size={14}/></button></div>
+        <div className="method-brief-heading"><span>{index + 1}.</span><h3 title={s.title}>{sectionTitle(s).replace(/^方法[：: ]*/, '')}</h3><button className="icon-btn tiny" title="查看方法原文" onClick={() => onGo(s.id, s.page)}><ArrowUpRight size={14}/></button></div>
         {methodBrief(s) && <p>{methodBrief(s)}</p>}
       </div>)}</div>
     </ReadingDisclosure>;
@@ -40,9 +39,9 @@ export default function AnalysisSections({ paper, active, focus, figureBusy, onG
       className={'reader-section ' + (isActive(group.sections) ? 'is-active' : '')} id={'section-' + s.id}
       hidden={focus && !isActive(group.sections)}
       initiallyOpen={!readLocal<Record<string, boolean>>('collapsed-' + paper.id, {})[s.id]}>
-      <summary><span className="section-number">{i + 1}</span><h2><ReadingTitle title={group.themed || group.sections.length > 1 ? group.title : s.title} fallback={group.title} referenceTitles={group.sections.map(s=>s.title)}/></h2>
+      <summary><span className="section-number">{i + 1}</span><h2><ReadingTitle title={group.title} fallback={group.title}/></h2>
         <div className="section-actions">
-          <button className="icon-btn tiny" title="校准小节原文位置" onClick={e=>{e.preventDefault();e.stopPropagation();onBind(s);}}><Crosshair size={14}/></button><button className="icon-btn tiny" title="编辑小节正文" onClick={e => { e.preventDefault(); e.stopPropagation(); onSectionEdit(structuredClone(s)); }}><PencilLine size={14}/></button>
+          
           <button className="icon-btn tiny" title={'定位原文第 ' + s.page + ' 页'} onClick={e => { e.preventDefault(); e.stopPropagation(); onGo(s.id, s.page); }}><ArrowUpRight size={14}/></button>
           <ChevronDown size={15}/>
         </div>
@@ -52,7 +51,7 @@ export default function AnalysisSections({ paper, active, focus, figureBusy, onG
         {group.sections.map((s, partIndex) => s.figures.length ? <div key={s.id} id={partIndex ? 'section-' + s.id : undefined} className="reader-section-part">
         {s.figures.map(f => <ReadingDisclosure paperId={paper.id} foldId={'figure:' + s.id + ':' + f.id} key={f.id}
           id={'figure-' + f.id} className="reader-figure" initiallyOpen>
-          <summary><span className="figure-badge">图</span><h3><ReadingTitle title={f.title} fallback="图表"/></h3><div className="reader-figure-tools" onClick={e=>{e.preventDefault();e.stopPropagation();}}><button className="icon-btn" title="看原图" aria-label="看原图" onClick={() => onPreview(f)}><ArrowUpRight size={15}/></button><button className="icon-btn" title="框选精读" aria-label="框选精读" onClick={() => onCrop(s.id, f)}><Crop size={15}/></button><ActionMenu label="更多图表工具"><button onClick={() => onPin(f)}><Pin size={14}/>固定看图</button><button title="框选对应原文区域，以后点击可直达此处" onClick={()=>onBind(s,f)}><Crosshair size={14}/>校准定位</button><button disabled={!!figureBusy} onClick={() => onDeepFigure(s.id, f)}>{figureBusy === f.id ? <LoaderCircle size={14} className="spin"/> : <Sparkles size={14}/>}逐图细读</button></ActionMenu></div><ChevronDown size={15}/></summary>
+          <summary><span className="figure-badge">图</span><h3><ReadingTitle title={f.title} fallback="图表"/></h3><ChevronDown size={15}/></summary>
           <div className="reader-figure-body">
 
             {f.panels.map((p, index) => {
@@ -77,7 +76,7 @@ export default function AnalysisSections({ paper, active, focus, figureBusy, onG
         {group.sections.some(s=>s.markdown||s.summary||s.proves) && <ReadingDisclosure paperId={paper.id} foldId={'body:' + group.id} className="reader-detail-group section-detail">
           <summary><span>正文说明</span><ChevronDown size={14}/></summary>
           {group.sections.map((s,partIndex)=><div key={s.id} id={partIndex && !s.figures.length ? 'section-' + s.id : undefined} className="merged-prose-part">
-            {partIndex>0&&<div className="continuation-tools"><button className="icon-btn tiny" title="编辑本段解析" onClick={()=>onSectionEdit(structuredClone(s))}><PencilLine size={14}/></button><button className="icon-btn tiny" title={'定位本段原文第 ' + s.page + ' 页'} onClick={()=>onGo(s.id,s.page)}><ArrowUpRight size={14}/></button></div>}
+            {partIndex>0&&<div className="continuation-tools"><button className="icon-btn tiny" title={'定位本段原文第 ' + s.page + ' 页'} onClick={()=>onGo(s.id,s.page)}><ArrowUpRight size={14}/></button></div>}
             {(partIndex>0?s.proves||s.summary:s.proves&&s.summary)&&<div className="prose"><MD text={partIndex>0?s.proves||s.summary:s.summary}/></div>}
             {partIndex>0&&s.proves&&s.summary&&s.summary!==s.proves&&<div className="prose"><MD text={s.summary}/></div>}
             {s.markdown&&<SectionDetails paperId={paper.id} sectionId={s.id} text={s.markdown}/>}

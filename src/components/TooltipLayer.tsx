@@ -9,10 +9,10 @@ export default function TooltipLayer(){
     let active:HTMLElement|null=null,timer:number|undefined,previous:string|null=null;
     const clear=()=>{window.clearTimeout(timer);if(active){if(previous===null)active.removeAttribute('aria-describedby');else active.setAttribute('aria-describedby',previous);}active=null;previous=null;setHint(null);setPosition(null);};
     const show=(target:EventTarget|null)=>{
-      const button=target instanceof Element?target.closest<HTMLElement>('button[title],button[aria-label],input[title]'):null;
+      const button=target instanceof Element?target.closest<HTMLElement>('button[title],button[aria-label],a[title],input[title]'):null;
       if(!button||!button.closest('.app,.pdf-viewer')){clear();return;}
       if(button===active)return;
-      clear();active=button;const label=button.getAttribute('title')||button.getAttribute('aria-label');if(!label)return;
+      clear();active=button;const label=button.dataset.tooltip||button.getAttribute('title')||button.getAttribute('aria-label');if(!label)return;
       timer=window.setTimeout(()=>{if(active!==button||!button.isConnected)return;previous=button.getAttribute('aria-describedby');button.setAttribute('aria-describedby',[previous,id].filter(Boolean).join(' '));setHint({label,detail:button.dataset.help||'',rect:button.getBoundingClientRect()});},220);
     };
     const enter=(e:Event)=>show(e.target);
